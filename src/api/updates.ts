@@ -27,13 +27,14 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   const name = nameMatch ? nameMatch[1].trim() : tag;
   const dateMatch = html.match(/datetime="([^"]+)"/);
   const publishedAt = dateMatch ? dateMatch[1] : '';
+  const assetMatch = html.match(/\/releases\/download\/[^"'\s<>]+?\.apk/);
   return {
     tag,
     name,
     published_at: publishedAt,
     url: `https://github.com/${APP_REPO}/releases/tag/${tag}`,
     notes: '',
-    download_url: null,
+    download_url: assetMatch ? `https://github.com${assetMatch[0]}` : buildDownloadUrl(tag),
   };
 }
 

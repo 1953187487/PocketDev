@@ -1,25 +1,51 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { THEME } from '@/config';
+import { ThemeProvider, useTheme } from '@/theme';
+import { ForceUpdateModal } from '@/components/ForceUpdateModal';
+import { checkForUpdate, type ReleaseInfo } from '@/api/updates';
 
-const t = THEME.dark;
+function ThemedRoot() {
+  const { theme } = useTheme();
+  const [checking, setChecking] = useState(true);
+  const [release, setRelease] = useState<ReleaseInfo | null>(null);
+  const [hasUpdate, setHasUpdate] = useState(false);
 
-export default function RootLayout() {
+  const check = useCallback(async () => {
+    setChecking(true);
+    const { hasUpdate: has, release: rel } = await checkForUpdate();
+    setHasUpdate(has);
+    setRelease(rel);
+    setChecking(false);
+  }, []);
+
+  useEffect(() => {
+    check();
+  }, [check]);
+
   return (
     <>
-      <StatusBar style="light" />
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: t.surface },
-          headerTintColor: t.text,
+          headerStyle: { backgroundColor: theme.palette.surface },
+          headerTintColor: theme.palette.text,
           headerTitleStyle: { fontWeight: '700' },
-          contentStyle: { backgroundColor: t.bg },
+          contentStyle: { backgroundColor: theme.palette.bg },
           headerShadowVisible: false,
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
+      <ForceUpdateModal visible={hasUpdate} release={release} />
     </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <ThemedRoot />
+    </ThemeProvider>
   );
 }

@@ -1,26 +1,38 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { THEME } from '@/config';
-
-const t = THEME.dark;
+import { BlurView } from 'expo-blur';
+import { useTheme } from '@/theme';
 
 export default function TabsLayout() {
+  const { theme } = useTheme();
+  const { palette, primary } = theme;
+
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: t.surface },
-        headerTintColor: t.text,
+        headerStyle: { backgroundColor: palette.surface },
+        headerTintColor: palette.text,
         headerTitleStyle: { fontWeight: '700' },
+        headerBackground: () => (
+          <BlurView intensity={40} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        ),
         tabBarStyle: {
-          backgroundColor: t.surface,
-          borderTopColor: t.border,
-          height: 60,
+          position: 'absolute',
+          backgroundColor: 'transparent',
+          borderTopColor: palette.glassBorder,
+          borderTopWidth: StyleSheet.hairlineWidth,
+          elevation: 0,
+          height: 62,
           paddingBottom: 8,
           paddingTop: 6,
         },
-        tabBarActiveTintColor: t.primary,
-        tabBarInactiveTintColor: t.textDim,
+        tabBarBackground: () => (
+          <BlurView intensity={45} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+        ),
+        tabBarActiveTintColor: primary,
+        tabBarInactiveTintColor: palette.textDim,
       }}
     >
       <Tabs.Screen
