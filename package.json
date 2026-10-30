@@ -1,0 +1,33 @@
+{
+  "name": "pocketdev",
+  "version": "1.0.0",
+  "description": "手机端 AI 开发工具（基于 chaitin/MonkeyCode 底层能力）",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "^55.0.27",
+    "expo-constants": "~55.0.16",
+    "expo-status-bar": "~55.0.6",
+    "expo-router": "~55.0.16",
+    "expo-updates": "~55.0.25",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "react-native": "0.83.6",
+    "react-native-safe-area-context": "~5.6.2",
+    "react-native-screens": "~4.23.0",
+    "react-native-webview": "13.16.0",
+    "react-native-web": "~0.21.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~5.9.2"
+  }
+}

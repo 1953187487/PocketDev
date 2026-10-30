@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "PocketDev",
+    "slug": "pocketdev",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "pocketdev",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.pocketdev.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1020"
+      },
+      "permissions": []
+    },
+    "iosunused": false,
+    "ios": {
+      "bundleIdentifier": "com.pocketdev.app",
+      "supportsTablet": true
+    },
+    "plugins": [
+      "expo-router",
+      "expo-updates"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": ""
+      }
+    }
+  }
+}
