@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   KeyboardTypeOptions,
   Pressable,
+  ScrollView,
   StyleProp,
   StyleSheet,
   Text,
@@ -124,6 +125,39 @@ export function Surface({
         />
       ) : null}
       <View style={[styles.surfaceInner, padded && { padding: space.lg }]}>{children}</View>
+    </View>
+  );
+}
+
+export function SubScreen({
+  title,
+  onBack,
+  children,
+  right,
+}: {
+  title: string;
+  onBack: () => void;
+  children: React.ReactNode;
+  right?: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const { palette } = theme;
+  return (
+    <View style={[styles.screen, { backgroundColor: palette.bg }]}>
+      <AuroraBackdrop />
+      <View style={[styles.subHeader, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={onBack} hitSlop={10} style={[styles.subBack, { borderColor: palette.border }]}>
+          <Ionicons name="chevron-back" size={20} color={palette.text} />
+        </Pressable>
+        <Text style={[styles.subTitle, { color: palette.text }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <View style={styles.subRight}>{right}</View>
+      </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} keyboardShouldPersistTaps="handled">
+        {children}
+      </ScrollView>
     </View>
   );
 }
@@ -493,4 +527,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
+  subHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.md,
+  },
+  subBack: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subTitle: { flex: 1, fontSize: 18, fontWeight: '800' },
+  subRight: { minWidth: 36, alignItems: 'flex-end' },
 });

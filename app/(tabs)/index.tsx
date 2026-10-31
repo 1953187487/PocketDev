@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,7 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { AuroraBackdrop } from '@/components/ui';
 import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
-import { streamChat, ChatError } from '@/api/ai';
+import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
+import { speak, stopSpeaking } from '@/api/speech';
 
 interface Bubble {
   id: string;
@@ -38,7 +40,7 @@ export default function ChatScreen() {
   const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
-  const { provider, providerReady, workspaces, setTabBarVisible } = useAppStore();
+  const { provider, providerReady, workspaces, setTabBarVisible, prefs } = useAppStore();
   const activeWs = useActiveWorkspace();
 
   const [messages, setMessages] = useState<Bubble[]>([]);
@@ -47,6 +49,8 @@ export default function ChatScreen() {
   const [wsOpen, setWsOpen] = useState(false);
   const [keyboardOn, setKeyboardOn] = useState(false);
   const [scrollToBottom, setScrollToBottom] = useState(0);
+  const [translateMsg, setTranslateMsg] = useState<{ text: string; result: string; lang: string } | null>(null);
+  const [translating, setTranslating] = useState(false);
   const listRef = useRef<FlatList<Bubble>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -158,6 +162,36 @@ export default function ChatScreen() {
     setSending(false);
   }, []);
 
+  const doTranslate = useCallback(
+    async (text: string, lang: string) => {
+      if (!provider.apiKey.trim()) {
+        append({ id: `sys-${Date.now()}`, role: 'assistant', text: '尚未配置服务商，无法翻译。请先在设置中配置 API Key。', error: true });
+        return;
+      }
+      setTranslateMsg({ text, result: '', lang });
+      setTranslating(true);
+      try {
+        const out = await translateText(provider, text, lang);
+        setTranslateMsg({ text, result: out, lang });
+      } catch (e) {
+        const msg = e instanceof ChatError ? e.message : '翻译失败，请检查服务商配置';
+        setTranslateMsg({ text, result: msg, lang });
+      } finally {
+        setTranslating(false);
+      }
+    },
+    [provider, append],
+  );
+
+  const doSpeak = useCallback(
+    (text: string) => {
+      if (!prefs.voiceEnabled || !text.trim()) return;
+      if (prefs.language === 'en') speak(text, 'en-US');
+      else speak(text, 'zh-CN');
+    },
+    [prefs.voiceEnabled, prefs.language],
+  );
+
   const chooseWs = useCallback((ws: Workspace | null) => {
     setWsOpen(false);
     append({
@@ -236,6 +270,18 @@ export default function ChatScreen() {
           <View style={[styles.bubble, styles.bubbleUser, { backgroundColor: alpha(primary, palette.mode === 'dark' ? 0.24 : 0.9) }]}>
             <Text style={{ color: palette.mode === 'dark' ? '#F2F6FF' : '#0E1526', fontSize: 15, lineHeight: 21 }}>{item.text}</Text>
           </View>
+          {item.text && !item.streaming && prefs.translateEnabled ? (
+            <View style={styles.msgActions}>
+              <Pressable hitSlop={8} onPress={() => doTranslate(item.text, prefs.language === 'en' ? 'zh' : 'en')} style={styles.msgAction}>
+                <Ionicons name="language-outline" size={15} color={palette.textFaint} />
+              </Pressable>
+              {prefs.voiceEnabled ? (
+                <Pressable hitSlop={8} onPress={() => doSpeak(item.text)} style={styles.msgAction}>
+                  <Ionicons name="volume-medium-outline" size={15} color={palette.textFaint} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       );
     }
@@ -244,12 +290,26 @@ export default function ChatScreen() {
         <View style={[styles.aiAvatar, { backgroundColor: primary }]}>
           <Ionicons name="sparkles" size={13} color={primaryText} />
         </View>
-        <View style={[styles.bubble, styles.bubbleAi, { borderColor: palette.border, backgroundColor: palette.surface }]}>
-          {item.text ? (
-            <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 21 }}>{item.text}</Text>
-          ) : (
-            <TypingDots color={primary} />
-          )}
+        <View>
+          <View style={[styles.bubble, styles.bubbleAi, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+            {item.text ? (
+              <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 21 }}>{item.text}</Text>
+            ) : (
+              <TypingDots color={primary} />
+            )}
+          </View>
+          {item.text && !item.streaming && prefs.translateEnabled ? (
+            <View style={styles.msgActions}>
+              <Pressable hitSlop={8} onPress={() => doTranslate(item.text, prefs.language === 'en' ? 'zh' : 'en')} style={styles.msgAction}>
+                <Ionicons name="language-outline" size={15} color={palette.textFaint} />
+              </Pressable>
+              {prefs.voiceEnabled ? (
+                <Pressable hitSlop={8} onPress={() => doSpeak(item.text)} style={styles.msgAction}>
+                  <Ionicons name="volume-medium-outline" size={15} color={palette.textFaint} />
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
     );
@@ -320,6 +380,75 @@ export default function ChatScreen() {
         onSelect={chooseWs}
         onCreate={() => setWsOpen(false)}
       />
+
+      {translateMsg ? (
+        <TranslateSheet
+          data={translateMsg}
+          translating={translating}
+          onClose={() => setTranslateMsg(null)}
+          onLang={(lang) => doTranslate(translateMsg.text, lang)}
+          onSpeak={() => doSpeak(translateMsg.result)}
+          canSpeak={prefs.voiceEnabled}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function TranslateSheet({
+  data,
+  translating,
+  onClose,
+  onLang,
+  onSpeak,
+  canSpeak,
+}: {
+  data: { text: string; result: string; lang: string };
+  translating: boolean;
+  onClose: () => void;
+  onLang: (lang: string) => void;
+  onSpeak: () => void;
+  canSpeak: boolean;
+}) {
+  const { theme } = useTheme();
+  const { palette, primary } = theme;
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.34)' }]} />
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + 16, borderColor: palette.border, backgroundColor: palette.mode === 'dark' ? '#121828' : '#FFFFFF' }]}>
+        <View style={styles.sheetHandle} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={[styles.sheetTitle, { color: palette.text }]}>翻译</Text>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {canSpeak ? (
+              <Pressable onPress={onSpeak} hitSlop={8}>
+                <Ionicons name="volume-high-outline" size={20} color={palette.textDim} />
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={22} color={palette.textDim} />
+            </Pressable>
+          </View>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginVertical: 12 }}>
+          {TRANSLATE_LANGS.map((l) => (
+            <Pressable
+              key={l.code}
+              onPress={() => onLang(l.code)}
+              style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill, borderWidth: 1, borderColor: data.lang === l.code ? primary : palette.border }}
+            >
+              <Text style={{ color: data.lang === l.code ? primary : palette.textDim, fontSize: 12.5, fontWeight: '600' }}>{l.label}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+        <Text style={{ color: palette.textFaint, fontSize: 11.5, marginBottom: 4 }}>原文</Text>
+        <Text style={{ color: palette.textDim, fontSize: 13.5, lineHeight: 20, marginBottom: 14 }}>{data.text}</Text>
+        <Text style={{ color: palette.textFaint, fontSize: 11.5, marginBottom: 4 }}>译文{translating ? '（翻译中…）' : ''}</Text>
+        <ScrollView style={{ maxHeight: 240 }} contentContainerStyle={{ paddingBottom: 8 }}>
+          <Text style={{ color: palette.text, fontSize: 14.5, lineHeight: 22 }}>{data.result || '…'}</Text>
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -463,6 +592,8 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '82%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.lg },
   bubbleUser: { borderBottomRightRadius: 6 },
   bubbleAi: { borderBottomLeftRadius: 6, borderWidth: 1 },
+  msgActions: { flexDirection: 'row', gap: 12, marginTop: 6, paddingHorizontal: 2 },
+  msgAction: { paddingVertical: 2 },
   dots: { flexDirection: 'row', gap: 5, height: 20, alignItems: 'center' },
   dot: { width: 7, height: 7, borderRadius: 4 },
   composer: { paddingHorizontal: space.lg, paddingTop: 8 },

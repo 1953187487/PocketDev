@@ -1,4 +1,6 @@
 import { APP_REPO, APP_VERSION } from '@/config';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 export interface ReleaseInfo {
   tag: string;
@@ -67,4 +69,49 @@ export function buildDownloadUrl(tag: string): string {
 
 export function normalizeBaseUrl(url: string): string {
   return trimBase(url);
+}
+
+export interface DownloadState {
+  phase: 'idle' | 'downloading' | 'install' | 'done' | 'error';
+  percent: number;
+  uri: string | null;
+  message?: string;
+}
+
+/** 下载 APK 到缓存目录，进度通过 onProgress 回调。 */
+export async function downloadApk(
+  url: string,
+  onProgress: (percent: number) => void,
+): Promise<string> {
+  const fileName = url.split('/').pop() ?? `pocketdev-${Date.now()}.apk`;
+  const dir = FileSystem.cacheDirectory + 'pocketdev-updates/';
+  if (!(await FileSystem.getInfoAsync(dir)).exists) {
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+  }
+  const dest = `${dir}${fileName}`;
+  const resumable = FileSystem.createDownloadResumable(
+    url,
+    dest,
+    { headers: { 'User-Agent': 'PocketDev' } },
+    (data) => {
+      if (data.totalBytesExpectedToWrite > 0) {
+        onProgress(Math.round((data.totalBytesWritten / data.totalBytesExpectedToWrite) * 100));
+      }
+    },
+  );
+  const result = await resumable.downloadAsync();
+  if (!result || result.status !== 200) throw new Error(`下载失败（HTTP ${result?.status ?? 'null'}）`);
+  return result.uri;
+}
+
+/** 打开系统安装器安装已下载的 APK。 */
+export async function installApk(uri: string): Promise<void> {
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, {
+      mimeType: 'application/vnd.android.package-archive',
+      dialogTitle: '安装 PocketDev 更新',
+    });
+  } else {
+    throw new Error('当前设备不支持打开安装包');
+  }
 }

@@ -43,10 +43,44 @@ export const DEFAULT_GIT: GitConfig = {
   token: '',
 };
 
+export type AppLanguage = 'zh' | 'en';
+
+export interface LocalModel {
+  id: string;
+  name: string;
+  kind: 'llm' | 'translation' | 'voice';
+  source: 'download' | 'import';
+  uri: string;
+  size: number;
+  createdAt: number;
+}
+
+export interface AppPrefs {
+  language: AppLanguage;
+  onboarded: boolean;
+  agreementsAccepted: boolean;
+  privacyAccepted: boolean;
+  autoUpdate: boolean;
+  voiceEnabled: boolean;
+  translateEnabled: boolean;
+}
+
+export const DEFAULT_PREFS: AppPrefs = {
+  language: 'zh',
+  onboarded: false,
+  agreementsAccepted: false,
+  privacyAccepted: false,
+  autoUpdate: true,
+  voiceEnabled: true,
+  translateEnabled: true,
+};
+
 const PROVIDER_KEY = 'cfg_provider';
 const GIT_KEY = 'cfg_git';
 const WORKSPACES_KEY = 'workspaces';
 const ACTIVE_WS_KEY = 'active_workspace';
+const PREFS_KEY = 'app_prefs';
+const MODELS_KEY = 'local_models';
 
 interface AppStore {
   provider: ProviderConfig;
@@ -66,6 +100,12 @@ interface AppStore {
 
   tabBarVisible: boolean;
   setTabBarVisible: (v: boolean) => void;
+
+  prefs: AppPrefs;
+  setPrefs: (p: Partial<AppPrefs>) => void;
+  localModels: LocalModel[];
+  addLocalModel: (m: Omit<LocalModel, 'id' | 'createdAt'>) => void;
+  removeLocalModel: (id: string) => void;
 }
 
 const Ctx = createContext<AppStore | null>(null);
@@ -82,20 +122,26 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [providerReady, setProviderReady] = useState(false);
   const [gitReady, setGitReady] = useState(false);
   const [tabBarVisible, setTabBarVisible] = useState(true);
+  const [prefs, setPrefsState] = useState<AppPrefs>(DEFAULT_PREFS);
+  const [localModels, setLocalModels] = useState<LocalModel[]>([]);
   const hydrated = useRef(false);
 
   useEffect(() => {
     (async () => {
-      const [p, g, ws, active] = await Promise.all([
+      const [p, g, ws, active, pre, mods] = await Promise.all([
         getObject<Partial<ProviderConfig>>(PROVIDER_KEY),
         getObject<Partial<GitConfig>>(GIT_KEY),
         getObject<Workspace[]>(WORKSPACES_KEY),
         getObject<string>(ACTIVE_WS_KEY),
+        getObject<Partial<AppPrefs>>(PREFS_KEY),
+        getObject<LocalModel[]>(MODELS_KEY),
       ]);
       if (p) setProviderState({ ...DEFAULT_PROVIDER, ...p });
       if (g) setGitState({ ...DEFAULT_GIT, ...g });
       if (Array.isArray(ws)) setWorkspaces(ws);
       if (typeof active === 'string') setActiveId(active);
+      if (pre) setPrefsState({ ...DEFAULT_PREFS, ...pre });
+      if (Array.isArray(mods)) setLocalModels(mods);
       setProviderReady(true);
       setGitReady(true);
       hydrated.current = true;
@@ -153,6 +199,35 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     [workspaces, activeWorkspaceId, persistWorkspaces],
   );
 
+  const setPrefs = useCallback((patch: Partial<AppPrefs>) => {
+    setPrefsState((prev) => {
+      const next = { ...prev, ...patch };
+      void setObject(PREFS_KEY, next);
+      return next;
+    });
+  }, []);
+
+  const addLocalModel = useCallback(
+    (m: Omit<LocalModel, 'id' | 'createdAt'>) => {
+      const created: LocalModel = { id: uid(), createdAt: Date.now(), ...m };
+      setLocalModels((prev) => {
+        const next = [created, ...prev];
+        void setObject(MODELS_KEY, next);
+        return next;
+      });
+      return created;
+    },
+    [],
+  );
+
+  const removeLocalModel = useCallback((id: string) => {
+    setLocalModels((prev) => {
+      const next = prev.filter((m) => m.id !== id);
+      void setObject(MODELS_KEY, next);
+      return next;
+    });
+  }, []);
+
   const value = useMemo<AppStore>(
     () => ({
       provider,
@@ -169,6 +244,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       removeWorkspace,
       tabBarVisible,
       setTabBarVisible,
+      prefs,
+      setPrefs,
+      localModels,
+      addLocalModel,
+      removeLocalModel,
     }),
     [
       provider,
@@ -185,6 +265,11 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       removeWorkspace,
       tabBarVisible,
       setTabBarVisible,
+      prefs,
+      setPrefs,
+      localModels,
+      addLocalModel,
+      removeLocalModel,
     ],
   );
 

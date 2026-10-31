@@ -176,3 +176,38 @@ export async function testProvider(cfg: ProviderConfig): Promise<{ ok: boolean; 
     return { ok: false, message: (e as Error).message };
   }
 }
+
+const LANG_NAMES: Record<string, string> = {
+  zh: '中文（简体）',
+  en: 'English',
+  ja: '日语',
+  ko: '韩语',
+  fr: '法语',
+  de: '德语',
+  es: '西班牙语',
+  ru: '俄语',
+};
+
+/** 使用已配置的服务商把文本翻译到目标语言。 */
+export async function translateText(
+  cfg: ProviderConfig,
+  text: string,
+  targetLang: string,
+  onDelta?: (t: string) => void,
+  signal?: AbortSignal,
+): Promise<string> {
+  const name = LANG_NAMES[targetLang] ?? targetLang;
+  const system =
+    '你是一个专业翻译引擎。只输出翻译结果，保留原始换行、Markdown 与代码块结构，不要解释、不要加引号。';
+  const user = `请把下面内容翻译成${name}：\n\n${text}`;
+  return streamChat(
+    cfg,
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    { onDelta: onDelta ?? (() => {}), signal },
+  );
+}
+
+export const TRANSLATE_LANGS = Object.entries(LANG_NAMES).map(([code, label]) => ({ code, label }));

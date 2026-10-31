@@ -2,7 +2,7 @@
   "expo": {
     "name": "PocketDev",
     "slug": "pocketdev",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "scheme": "pocketdev",
     "userInterfaceStyle": "automatic",
@@ -11,12 +11,14 @@
     "backgroundColor": "#080B16",
     "android": {
       "package": "com.pocketdev.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/adaptive-icon.png",
         "backgroundColor": "#0B1020"
       },
-      "permissions": []
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ]
     },
     "androidStatusBar": {
       "barStyle": "light-content"
@@ -41,7 +43,8 @@
             "image": "./assets/brand/splash-icon.png"
           }
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true
