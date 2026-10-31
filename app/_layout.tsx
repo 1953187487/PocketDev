@@ -10,7 +10,9 @@ import { AppStoreProvider, useAppStore } from '@/store/app';
 import { LaunchScreen } from '@/components/LaunchScreen';
 import { ForceUpdateModal } from '@/components/ForceUpdateModal';
 import { Onboarding } from '@/components/Onboarding';
+import { StarReminder } from '@/components/StarReminder';
 import { checkForUpdate, type ReleaseInfo } from '@/api/updates';
+import { APP_VERSION } from '@/config';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -67,7 +69,8 @@ function ThemedRoot() {
       </Stack>
       {launching ? <LaunchScreen onFinish={() => setLaunching(false)} /> : null}
       <ForceUpdateModal visible={hasUpdate && !launching && prefs.onboarded} release={release} />
-      {providerReady && !prefs.onboarded ? <Onboarding /> : null}
+      {providerReady && (!prefs.onboarded || prefs.onboardedVersion !== APP_VERSION) ? <Onboarding /> : null}
+      <StarReminder />
     </View>
   );
 }

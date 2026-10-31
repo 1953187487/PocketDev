@@ -1,12 +1,12 @@
 import { Button, Divider, Pill, Row, SubScreen } from '@/ui';
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { AGREEMENTS } from '@/agreements';
 import { useAppStore } from '@/store/app';
-import { APP_REPO_URL } from '@/config';
+import { APP_REPO_URL, DEVELOPERS, CONTRIBUTORS } from '@/config';
 
 const SECURITY_ITEMS: { icon: keyof typeof Ionicons.glyphMap; title: string; desc: string }[] = [
   { icon: 'lock-closed-outline', title: '本地加密存储', desc: '服务商配置与访问令牌仅保存在设备私有目录，卸载即清除' },
@@ -74,6 +74,40 @@ export default function AgreementsScreen() {
               <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>{s.title}</Text>
               <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 18 }}>{s.desc}</Text>
             </View>
+          </Row>
+        ))}
+
+        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 22, marginBottom: 10 }}>开发者与贡献者</Text>
+        {DEVELOPERS.map((d) => (
+          <Row key={d.name} style={{ gap: 12, paddingVertical: 8, alignItems: 'center' }}>
+            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.1) }]}>
+              <Ionicons name="person-circle-outline" size={18} color={primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>{d.name}</Text>
+              <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 18 }}>{d.role}</Text>
+            </View>
+            {d.link ? (
+              <Pressable hitSlop={8} onPress={() => d.link && Linking.openURL(d.link)}>
+                <Ionicons name="open-outline" size={16} color={palette.textDim} />
+              </Pressable>
+            ) : null}
+          </Row>
+        ))}
+        {CONTRIBUTORS.map((c) => (
+          <Row key={c.name} style={{ gap: 12, paddingVertical: 8, alignItems: 'center' }}>
+            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.06) }]}>
+              <Ionicons name="people-outline" size={16} color={palette.textDim} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '600' }}>{c.name}</Text>
+              <Text style={{ color: palette.textFaint, fontSize: 11.5, marginTop: 2, lineHeight: 17 }}>{c.role}</Text>
+            </View>
+            {c.link ? (
+              <Pressable hitSlop={8} onPress={() => c.link && Linking.openURL(c.link)}>
+                <Ionicons name="open-outline" size={15} color={palette.textFaint} />
+              </Pressable>
+            ) : null}
           </Row>
         ))}
 

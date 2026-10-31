@@ -1,52 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/theme';
 
-const MARK_LINES = [
-  { x1: 0.4, y1: 0.32, x2: 0.3, y2: 0.5 },
-  { x1: 0.3, y1: 0.5, x2: 0.4, y2: 0.68 },
-  { x1: 0.6, y1: 0.32, x2: 0.7, y2: 0.5 },
-  { x1: 0.7, y1: 0.5, x2: 0.6, y2: 0.68 },
-  { x1: 0.53, y1: 0.32, x2: 0.47, y2: 0.68 },
-];
-
-function Mark({ size, color }: { size: number; color: string }) {
-  const stroke = size * 0.055;
-  return (
-    <View style={{ width: size, height: size }}>
-      {MARK_LINES.map((l, i) => {
-        const x1 = l.x1 * size;
-        const y1 = l.y1 * size;
-        const x2 = l.x2 * size;
-        const y2 = l.y2 * size;
-        const len = Math.hypot(x2 - x1, y2 - y1);
-        const angle = (Math.atan2(y2 - y1, x2 - x1) * 180) / Math.PI;
-        const cx = (x1 + x2) / 2;
-        const cy = (y1 + y2) / 2;
-        return (
-          <View
-            key={i}
-            style={{
-              position: 'absolute',
-              left: cx - len / 2,
-              top: cy - stroke / 2,
-              width: len,
-              height: stroke,
-              borderRadius: stroke / 2,
-              backgroundColor: color,
-              transform: [{ rotate: `${angle}deg` }],
-            }}
-          />
-        );
-      })}
-    </View>
-  );
-}
+/** 品牌主色：与应用图标（蓝紫青渐变方块 + 白 `</>`）一致。 */
+const BRAND_PURPLE = '#A97BFF';
 
 export function LaunchScreen({ onFinish }: { onFinish?: () => void }) {
   const { theme } = useTheme();
-  const { palette, primary } = theme;
+  const { palette } = theme;
 
   const glow = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.72)).current;
@@ -89,7 +51,7 @@ export function LaunchScreen({ onFinish }: { onFinish?: () => void }) {
         style={[
           styles.glow,
           {
-            backgroundColor: primary,
+            backgroundColor: BRAND_PURPLE,
             opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [0, palette.mode === 'dark' ? 0.28 : 0.2] }),
             transform: [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
           },
@@ -100,7 +62,7 @@ export function LaunchScreen({ onFinish }: { onFinish?: () => void }) {
           style={[
             styles.ring,
             {
-              borderColor: primary,
+              borderColor: BRAND_PURPLE,
               opacity: ringOpacity,
               transform: [{ scale: ringScale }],
             },
@@ -112,14 +74,7 @@ export function LaunchScreen({ onFinish }: { onFinish?: () => void }) {
             transform: [{ scale: logoScale }],
           }}
         >
-          <LinearGradient
-            colors={[primary, theme.accent.id === 'azure' ? '#A97BFF' : primary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.logoPlate}
-          >
-            <Mark size={54} color="#FFFFFF" />
-          </LinearGradient>
+          <Image source={require('../../assets/brand/icon.png')} style={styles.icon} resizeMode="contain" />
         </Animated.View>
         <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textShift }] }}>
           <Text style={[styles.title, { color: palette.text }]}>PocketDev</Text>
@@ -138,13 +93,7 @@ const styles = StyleSheet.create({
   glow: { position: 'absolute', width: 340, height: 340, borderRadius: 170 },
   center: { alignItems: 'center' },
   ring: { position: 'absolute', width: 128, height: 128, borderRadius: 64, borderWidth: 1.5 },
-  logoPlate: {
-    width: 92,
-    height: 92,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  icon: { width: 104, height: 104 },
   title: { fontSize: 25, fontWeight: '800', letterSpacing: 0.4, textAlign: 'center', marginTop: 26 },
   sub: { fontSize: 12.5, textAlign: 'center', marginTop: 6, letterSpacing: 0.6 },
   footer: { position: 'absolute', bottom: 46 },

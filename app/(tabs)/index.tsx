@@ -21,7 +21,7 @@ import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak, stopSpeaking } from '@/api/speech';
 import { loadApplets, runApplet, buildArgs } from '@/api/applets';
-import { inspectDir, listDir } from '@/api/localfs';
+import { inspectDir, listDir, writeTextFile } from '@/api/localfs';
 import type { ProviderConfig } from '@/store/app';
 
 interface Bubble {
@@ -208,6 +208,22 @@ export default function ChatScreen() {
         patch(aid, (b) => ({ ...b, text: full, streaming: false, plan: planned || undefined }));
         if (planned) setPlanAwaiting(aid);
 
+        // 计划工作区流动输出：计划模式下，把 AI 计划落到本地工作区文件，形成可留存的产出。
+        if (planned && activeWs?.kind === 'local' && activeWs.root && full.trim()) {
+          const ts = new Date();
+          const filePath = `${activeWs.root.replace(/\/+$/, '')}/pocketdev-plan-${ts.getTime()}.md`;
+          const header = `# PocketDev 执行计划\n\n- 生成时间：${ts.toLocaleString()}\n- 工作区：${activeWs.name}\n\n`;
+          const ok = await writeTextFile(filePath, header + full);
+          append({
+            id: `f-${Date.now()}`,
+            role: 'assistant',
+            text: ok
+              ? `计划已写入工作区文件：\n${filePath}`
+              : `写入工作区文件失败：${filePath}`,
+            tool: true,
+          });
+        }
+
         const call = parseCall(full);
         if (call && !planMode) {
           const applet = applets.find((a) => a.name === call.name);
@@ -254,7 +270,7 @@ export default function ChatScreen() {
         abortRef.current = null;
       }
     },
-    [append, patch, scrollToEnd, provider, systemPrompt, applets, planMode],
+    [append, patch, scrollToEnd, provider, systemPrompt, applets, planMode, activeWs],
   );
 
   const send = useCallback(
@@ -365,6 +381,11 @@ export default function ChatScreen() {
             {provider.model || 'AI 开发助手'}
           </Text>
         </View>
+        {messages.length > 0 ? (
+          <Pressable onPress={clearChat} hitSlop={8} style={[styles.iconWrap, { borderColor: palette.border }]}>
+            <Ionicons name="trash-outline" size={16} color={palette.textFaint} />
+          </Pressable>
+        ) : null}
       </View>
       <View style={styles.headerActions}>
         <Pressable
@@ -399,11 +420,6 @@ export default function ChatScreen() {
           </Text>
           <Ionicons name="chevron-down" size={12} color={activeWs ? primary : palette.textFaint} />
         </Pressable>
-        {messages.length > 0 ? (
-          <Pressable onPress={clearChat} style={[styles.iconWrap, { borderColor: palette.border }]}>
-            <Ionicons name="trash-outline" size={16} color={palette.textFaint} />
-          </Pressable>
-        ) : null}
       </View>
     </View>
   );

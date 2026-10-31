@@ -64,3 +64,19 @@ export async function readTextFile(path: string, maxBytes = 200000): Promise<str
     return null;
   }
 }
+
+/** 写入文本文件（不存在父目录时自动创建）。返回是否成功。 */
+export async function writeTextFile(path: string, content: string): Promise<boolean> {
+  try {
+    const dir = path.replace(/\/+$/, '').split('/').slice(0, -1).join('/');
+    if (dir) {
+      const info = await FileSystem.getInfoAsync(dir);
+      if (info.exists && !info.isDirectory) return false;
+      if (!info.exists) await FileSystem.makeDirectoryAsync(dir, { intermediates: true });
+    }
+    await FileSystem.writeAsStringAsync(path, content);
+    return true;
+  } catch {
+    return false;
+  }
+}

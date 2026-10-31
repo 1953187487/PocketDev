@@ -62,6 +62,8 @@ export interface LocalModel {
 export interface AppPrefs {
   language: AppLanguage;
   onboarded: boolean;
+  /** 完成引导时的 App 版本；与当前版本不一致时重走引导（每次更新）。 */
+  onboardedVersion: string;
   agreementsAccepted: boolean;
   privacyAccepted: boolean;
   autoUpdate: boolean;
@@ -74,6 +76,7 @@ export interface AppPrefs {
 export const DEFAULT_PREFS: AppPrefs = {
   language: 'zh',
   onboarded: false,
+  onboardedVersion: '',
   agreementsAccepted: false,
   privacyAccepted: false,
   autoUpdate: true,

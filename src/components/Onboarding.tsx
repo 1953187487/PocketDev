@@ -10,6 +10,7 @@ import { useAppStore, type AppLanguage, type InterfaceType } from '@/store/app';
 import { useI18n } from '@/i18n';
 import { checkForUpdate } from '@/api/updates';
 import { AGREEMENTS } from '@/agreements';
+import { APP_VERSION } from '@/config';
 
 const STEPS = 4;
 
@@ -84,7 +85,7 @@ export function Onboarding() {
 
   const allAgreed = AGREEMENTS.every((a) => agree[a.key]);
   const finish = useCallback(() => {
-    setPrefs({ onboarded: true, agreementsAccepted: true, privacyAccepted: true });
+    setPrefs({ onboarded: true, onboardedVersion: APP_VERSION, agreementsAccepted: true, privacyAccepted: true });
   }, [setPrefs]);
 
   const next = useCallback(() => {
