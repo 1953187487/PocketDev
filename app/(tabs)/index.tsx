@@ -153,30 +153,33 @@ export default function ChatScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
 
-  const systemPrompt = useCallback(() => {
-    const parts = [
-      '你是 PocketDev 内置的 AI 开发助手，专业、可靠、语言与用户保持一致（默认使用中文）。',
-      '请给出结构清晰、可直接使用的回答；涉及代码时用 Markdown 代码块，并注明语言。',
-    ];
-    if (wsContext) parts.push(`${wsContext}\n回答时优先结合该工作区上下文。`);
-    if (applets.length) {
-      const list = applets
-        .map((a) => `- ${a.name}（参数：${a.params.map((p) => p.key).join(', ') || '无'}）：${a.description || '无说明'}`)
-        .join('\n');
-      parts.push(
-        '你可以调用以下功能应用。需要调用时，单独一行输出标记：@CALL: 名称 以及参数键值对（JSON）。系统会执行并把结果反馈给你，然后你继续回答。仅使用列出的功能应用。\n可用功能应用：\n' +
-          list,
-      );
-    }
-    if (planMode) {
-      parts.push('当前处于计划模式：先输出编号的分步骤执行计划，结尾询问「是否按计划执行？」，等待确认后再实现细节。');
-    }
-    return parts.join('\n');
-  }, [wsContext, applets, planMode]);
+  const systemPrompt = useCallback(
+    (opts?: { execute?: boolean }) => {
+      const parts = [
+        '你是 PocketDev 内置的 AI 开发助手，专业、可靠、语言与用户保持一致（默认使用中文）。',
+        '请给出结构清晰、可直接使用的回答；涉及代码时用 Markdown 代码块，并注明语言。',
+      ];
+      if (wsContext) parts.push(`${wsContext}\n回答时优先结合该工作区上下文。`);
+      if (applets.length) {
+        const list = applets
+          .map((a) => `- ${a.name}（参数：${a.params.map((p) => p.key).join(', ') || '无'}）：${a.description || '无说明'}`)
+          .join('\n');
+        parts.push(
+          '你可以调用以下功能应用。需要调用时，单独一行输出标记：@CALL: 名称 以及参数键值对（JSON）。系统会执行并把结果反馈给你，然后你继续回答。仅使用列出的功能应用。\n可用功能应用：\n' +
+            list,
+        );
+      }
+      if (planMode && !opts?.execute) {
+        parts.push('当前处于计划模式：先输出编号的分步骤执行计划，结尾询问「是否按计划执行？」，等待确认后再实现细节。');
+      }
+      return parts.join('\n');
+    },
+    [wsContext, applets, planMode],
+  );
 
   const runTurn = useCallback(
-    async (content: string, historySrc: Bubble[]) => {
-      const aid = `a-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    async (content: string, historySrc: Bubble[], opts?: { execute?: boolean }) => {
+      const aid = `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
       append({ id: aid, role: 'assistant', text: '', streaming: true });
       setSending(true);
       scrollToEnd();
@@ -188,11 +191,12 @@ export default function ChatScreen() {
       const controller = new AbortController();
       abortRef.current = controller;
       let full = '';
+      const planned = planMode && !opts?.execute;
 
       try {
         full = await streamChat(
           provider,
-          [{ role: 'system', content: systemPrompt() }, ...history, { role: 'user', content }],
+          [{ role: 'system', content: systemPrompt(opts) }, ...history, { role: 'user', content }],
           {
             signal: controller.signal,
             onDelta: (d) => {
@@ -201,8 +205,8 @@ export default function ChatScreen() {
             },
           },
         );
-        patch(aid, (b) => ({ ...b, text: full, streaming: false, plan: planMode || undefined }));
-        if (planMode) setPlanAwaiting(aid);
+        patch(aid, (b) => ({ ...b, text: full, streaming: false, plan: planned || undefined }));
+        if (planned) setPlanAwaiting(aid);
 
         const call = parseCall(full);
         if (call && !planMode) {
@@ -293,8 +297,8 @@ export default function ChatScreen() {
 
   const confirmPlan = useCallback(() => {
     setPlanAwaiting(null);
-    void send('请按上面的计划开始执行。');
-  }, [send]);
+    void runTurn('请按上面的计划开始执行。', messagesRef.current, { execute: true });
+  }, [runTurn]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
