@@ -22,7 +22,7 @@ build_test:
 build:
   prebuild_command: npx expo prebuild -p android --no-install
   gradle_command: ./gradlew assembleRelease
-  gradle_flags: '--no-daemon --max-workers=1'
+  gradle_flags: '--no-daemon --max-workers=2'
   apk_dir: android/app/build/outputs/apk/release   # 相对 workdir
 
 release:
