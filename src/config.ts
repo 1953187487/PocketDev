@@ -42,7 +42,7 @@ export const CONTRIBUTORS: Contributor[] = [
 
 export const APP_REPO = '1953187487/PocketDev';
 export const APP_REPO_URL = 'https://github.com/1953187487/PocketDev';
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.0.1';
 export const BASE_LAYER_REPO = 'chaitin/MonkeyCode';
 
 export const DONATION = {

@@ -1,51 +1,62 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { ThemeProvider, useTheme } from '@/theme';
+import { AppStoreProvider } from '@/store/app';
+import { LaunchScreen } from '@/components/LaunchScreen';
 import { ForceUpdateModal } from '@/components/ForceUpdateModal';
 import { checkForUpdate, type ReleaseInfo } from '@/api/updates';
 
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 function ThemedRoot() {
   const { theme } = useTheme();
-  const [checking, setChecking] = useState(true);
+  const [launching, setLaunching] = useState(true);
   const [release, setRelease] = useState<ReleaseInfo | null>(null);
   const [hasUpdate, setHasUpdate] = useState(false);
 
   const check = useCallback(async () => {
-    setChecking(true);
     const { hasUpdate: has, release: rel } = await checkForUpdate();
     setHasUpdate(has);
     setRelease(rel);
-    setChecking(false);
   }, []);
 
   useEffect(() => {
     check();
   }, [check]);
 
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   return (
-    <>
-      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+    <View style={{ flex: 1, backgroundColor: theme.palette.bg }}>
+      <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} translucent />
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: theme.palette.surface },
-          headerTintColor: theme.palette.text,
-          headerTitleStyle: { fontWeight: '700' },
+          headerShown: false,
           contentStyle: { backgroundColor: theme.palette.bg },
-          headerShadowVisible: false,
         }}
       >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" />
       </Stack>
-      <ForceUpdateModal visible={hasUpdate} release={release} />
-    </>
+      {launching ? <LaunchScreen onFinish={() => setLaunching(false)} /> : null}
+      <ForceUpdateModal visible={hasUpdate && !launching} release={release} />
+    </View>
   );
 }
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <ThemedRoot />
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AppStoreProvider>
+          <ThemedRoot />
+        </AppStoreProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

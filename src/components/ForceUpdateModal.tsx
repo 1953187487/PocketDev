@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, Linking } from 'react-native';
+import { View, Text, StyleSheet, Modal, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useTheme } from '@/theme';
+import { alpha, radius, useTheme } from '@/theme';
 import { Button } from '@/components/ui';
 import type { ReleaseInfo } from '@/api/updates';
 import { APP_REPO_URL } from '@/config';
@@ -15,7 +15,7 @@ export function ForceUpdateModal({
   release: ReleaseInfo | null;
 }) {
   const { theme } = useTheme();
-  const { palette, primary, primaryText, accent } = theme;
+  const { palette, primary, primaryText } = theme;
   if (!visible || !release) return null;
 
   return (
@@ -23,12 +23,10 @@ export function ForceUpdateModal({
       <View style={styles.backdrop}>
         <BlurView intensity={40} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }]} />
-        <View style={[styles.panel, { borderColor: palette.glassBorder }]}>
-          <BlurView intensity={40} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.glassStrong }]} />
+        <View style={[styles.panel, { borderColor: palette.border, backgroundColor: palette.mode === 'dark' ? '#121828' : '#FFFFFF' }]}>
           <View style={styles.panelBody}>
-            <View style={[styles.iconWrap, { backgroundColor: accent.primary + '2B', borderColor: accent.primary + '55' }]}>
-              <Ionicons name="cloud-download" size={34} color={primary} />
+            <View style={[styles.iconWrap, { backgroundColor: alpha(primary, 0.12), borderColor: alpha(primary, 0.3) }]}>
+              <Ionicons name="cloud-download" size={32} color={primary} />
             </View>
             <Text style={[styles.title, { color: palette.text }]}>发现新版本</Text>
             <Text style={[styles.tag, { color: primary }]}>{release.tag}</Text>
@@ -55,16 +53,11 @@ export function ForceUpdateModal({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
+  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   panel: {
     width: '100%',
     maxWidth: 360,
-    borderRadius: 28,
+    borderRadius: radius.xxl,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -77,7 +70,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 72,
     height: 72,
-    borderRadius: 26,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

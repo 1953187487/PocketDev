@@ -1,130 +1,161 @@
 import React from 'react';
 import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
   ActivityIndicator,
-  TextInput,
   KeyboardTypeOptions,
-  ViewStyle,
+  Pressable,
   StyleProp,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  ViewStyle,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '@/theme';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { alpha, radius, space, type, useTheme } from '@/theme';
 
-export function GlassBackdrop() {
+export function AuroraBackdrop() {
   const { theme } = useTheme();
   const { palette, accent } = theme;
-  const strong = palette.mode === 'dark' ? 0.16 : 0.32;
+  const dark = palette.mode === 'dark';
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <View
-        style={[
-          styles.blob,
-          {
-            width: 280,
-            height: 280,
-            borderRadius: 140,
-            backgroundColor: accent.primary,
-            opacity: strong,
-            top: -70,
-            right: -90,
-          },
-        ]}
+      <LinearGradient
+        colors={dark ? ['#070A15', '#0A1024', '#080B16'] : ['#F6F9FF', '#EEF3FD', '#E8EEFA']}
+        start={{ x: 0.1, y: 0 }}
+        end={{ x: 0.9, y: 1 }}
+        style={StyleSheet.absoluteFill}
       />
-      <View
-        style={[
-          styles.blob,
-          {
-            width: 220,
-            height: 220,
-            borderRadius: 110,
-            backgroundColor: accent.primary,
-            opacity: strong * 0.6,
-            top: '38%',
-            left: -110,
-          },
-        ]}
+      <LinearGradient
+        colors={[palette.auroraA, 'transparent']}
+        start={{ x: 0.1, y: 0.05 }}
+        end={{ x: 0.85, y: 0.75 }}
+        style={[styles.aurora, { top: -170, left: -110, width: 430, height: 430, opacity: dark ? 0.85 : 0.95 }]}
       />
-      <View
-        style={[
-          styles.blob,
-          {
-            width: 180,
-            height: 180,
-            borderRadius: 90,
-            backgroundColor: accent.primary,
-            opacity: strong * 0.45,
-            bottom: -50,
-            right: '20%',
-          },
-        ]}
+      <LinearGradient
+        colors={[palette.auroraB, 'transparent']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0.1, y: 0.9 }}
+        style={[styles.aurora, { top: 90, right: -190, width: 420, height: 420, opacity: dark ? 0.7 : 0.8 }]}
       />
-      <View
-        style={[
-          styles.blob,
-          {
-            width: 140,
-            height: 140,
-            borderRadius: 70,
-            backgroundColor: palette.mode === 'dark' ? '#A78BFA' : '#7C3AED',
-            opacity: strong * 0.5,
-            bottom: '28%',
-            left: '12%',
-          },
-        ]}
+      <LinearGradient
+        colors={[palette.auroraC, 'transparent']}
+        start={{ x: 0.2, y: 1 }}
+        end={{ x: 0.9, y: 0.1 }}
+        style={[styles.aurora, { bottom: -190, left: -140, width: 400, height: 400, opacity: dark ? 0.55 : 0.7 }]}
       />
+      <LinearGradient
+        colors={[alpha(accent.primary, dark ? 0.2 : 0.14), 'transparent']}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={[styles.aurora, { bottom: '18%', right: '6%', width: 240, height: 240, borderRadius: 120 }]}
+      />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: dark ? 'rgba(4,6,12,0.18)' : 'rgba(255,255,255,0.22)' }]} />
     </View>
   );
 }
 
-export function Card({ children, style, glow = false }: { children: React.ReactNode; style?: StyleProp<ViewStyle>; glow?: boolean }) {
+export function Screen({
+  children,
+  style,
+  edges = true,
+  backdrop = true,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  edges?: boolean;
+  backdrop?: boolean;
+}) {
+  const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { palette, accent } = theme;
   return (
     <View
       style={[
-        styles.card,
-        { borderColor: palette.glassBorder },
-        glow && {
-          shadowColor: accent.primary,
-          shadowOpacity: theme.mode === 'dark' ? 0.45 : 0.3,
-          shadowRadius: 16,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 8,
+        styles.screen,
+        {
+          backgroundColor: theme.palette.bg,
+          paddingTop: edges ? insets.top : 0,
+          paddingLeft: insets.left,
+          paddingRight: insets.right,
         },
         style,
       ]}
     >
-      <BlurView intensity={36} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.glass }]} />
-      <LinearGradient
-        colors={[palette.glassHighlight, 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.cardSheen}
-      />
-      <View style={styles.cardBody}>{children}</View>
+      {backdrop ? <AuroraBackdrop /> : <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.palette.bg }]} />}
+      {children}
     </View>
   );
 }
 
-export function SectionTitle({ children }: { children: React.ReactNode }) {
+export function Surface({
+  children,
+  style,
+  tone = 'default',
+  padded = true,
+}: {
+  children: React.ReactNode;
+  style?: StyleProp<ViewStyle>;
+  tone?: 'default' | 'raised' | 'sunken';
+  padded?: boolean;
+}) {
   const { theme } = useTheme();
-  return <Text style={[styles.sectionTitle, { color: theme.palette.textDim }]}>{children}</Text>;
+  const { palette } = theme;
+  const bg =
+    tone === 'raised' ? alpha(palette.surfaceRaised.startsWith('#') ? palette.surfaceRaised : '#FFFFFF', palette.mode === 'dark' ? 0.9 : 1) : palette.surface;
+  return (
+    <View
+      style={[
+        styles.surface,
+        {
+          borderColor: palette.border,
+          backgroundColor: tone === 'sunken' ? palette.surfaceSunken : bg,
+          shadowColor: palette.shadow,
+        },
+        style,
+      ]}
+    >
+      {tone !== 'sunken' ? (
+        <BlurView
+          intensity={palette.mode === 'dark' ? 32 : 46}
+          tint={palette.mode === 'dark' ? 'dark' : 'light'}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+      <View style={[styles.surfaceInner, padded && { padding: space.lg }]}>{children}</View>
+    </View>
+  );
+}
+
+export function SectionLabel({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const { theme } = useTheme();
+  return (
+    <View style={[{ paddingHorizontal: space.lg, marginTop: space.xl, marginBottom: space.sm }, style]}>
+      <Text
+        style={{
+          color: theme.palette.textFaint,
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 1.1,
+          textTransform: 'uppercase',
+        }}
+      >
+        {children}
+      </Text>
+    </View>
+  );
 }
 
 export function Row({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.row, style]}>{children}</View>;
 }
 
-export function Spacer({ h = 8 }: { h?: number }) {
+export function Spacer({ h = space.md }: { h?: number }) {
   return <View style={{ height: h }} />;
 }
 
-type ButtonVariant = 'primary' | 'ghost' | 'danger' | 'subtle';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
 export function Button({
   title,
@@ -133,6 +164,8 @@ export function Button({
   loading = false,
   disabled = false,
   small = false,
+  icon,
+  style,
 }: {
   title: string;
   onPress: () => void;
@@ -140,51 +173,145 @@ export function Button({
   loading?: boolean;
   disabled?: boolean;
   small?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  style?: StyleProp<ViewStyle>;
 }) {
   const { theme } = useTheme();
-  const { palette, primary, primaryText, accent } = theme;
-  const isDisabled = disabled || loading;
-  const base = {
-    borderRadius: 14,
-    paddingVertical: small ? 9 : 12,
-    paddingHorizontal: small ? 12 : 16,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    opacity: isDisabled ? 0.5 : 1,
-  };
+  const { palette, primary, primaryText } = theme;
+  const off = disabled || loading;
+  const height = small ? 36 : 50;
+  const textColor =
+    variant === 'primary' ? primaryText : variant === 'danger' ? '#FFFFFF' : palette.text;
 
-  const content = loading ? (
-    <ActivityIndicator color={variant === 'primary' ? primaryText : primary} size="small" />
-  ) : (
-    <Text style={[styles.btnText, { color: variant === 'primary' ? primaryText : variant === 'danger' ? '#FFFFFF' : palette.text, fontSize: small ? 13 : 15 }]}>
-      {title}
-    </Text>
+  const inner = (
+    <View style={[styles.btnInner, { height, paddingHorizontal: small ? space.md : space.xl }]}>
+      {loading ? (
+        <ActivityIndicator size="small" color={textColor} />
+      ) : (
+        <>
+          {icon ? <Ionicons name={icon} size={small ? 15 : 18} color={textColor} style={{ marginRight: 6 }} /> : null}
+          <Text style={{ color: textColor, fontSize: small ? 13 : 15, fontWeight: '600' }} numberOfLines={1}>
+            {title}
+          </Text>
+        </>
+      )}
+    </View>
   );
 
   if (variant === 'primary') {
     return (
-      <Pressable onPress={onPress} disabled={isDisabled} style={({ pressed }) => [{ opacity: isDisabled ? 0.5 : pressed ? 0.86 : 1, borderRadius: 14, overflow: 'hidden', shadowColor: accent.primary, shadowOpacity: theme.mode === 'dark' ? 0.5 : 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 5 }, elevation: 6 }]}>
-        <LinearGradient colors={[primary, shade(primary, -18)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={base}>
-          {content}
+      <Pressable
+        onPress={onPress}
+        disabled={off}
+        style={({ pressed }) => [
+          { borderRadius: radius.lg, overflow: 'hidden', opacity: off ? 0.5 : pressed ? 0.9 : 1, transform: [{ scale: pressed && !off ? 0.985 : 1 }] },
+          style,
+        ]}
+      >
+        <LinearGradient colors={[primary, alpha(primary, 0.78)]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          {inner}
         </LinearGradient>
       </Pressable>
     );
   }
 
-  if (variant === 'danger') {
+  if (variant === 'secondary') {
     return (
-      <Pressable onPress={onPress} disabled={isDisabled} style={({ pressed }) => [base, { backgroundColor: palette.danger, opacity: isDisabled ? 0.5 : pressed ? 0.86 : 1 }]}>
-        {content}
+      <Pressable
+        onPress={onPress}
+        disabled={off}
+        style={({ pressed }) => [
+          {
+            borderRadius: radius.lg,
+            overflow: 'hidden',
+            borderWidth: 1,
+            borderColor: palette.borderStrong,
+            backgroundColor: palette.surface,
+            opacity: off ? 0.5 : pressed ? 0.9 : 1,
+          },
+          style,
+        ]}
+      >
+        {inner}
       </Pressable>
     );
   }
 
-  const ghostStyle: StyleProp<ViewStyle> =
-    variant === 'ghost' ? { borderWidth: 1, borderColor: primary } : { backgroundColor: palette.surfaceAlt };
-
   return (
-    <Pressable onPress={onPress} disabled={isDisabled} style={({ pressed }) => [base, ghostStyle, { opacity: isDisabled ? 0.5 : pressed ? 0.85 : 1 }]}>
-      {content}
+    <Pressable
+      onPress={onPress}
+      disabled={off}
+      style={({ pressed }) => [
+        styles.btnInner,
+        {
+          height,
+          paddingHorizontal: small ? space.md : space.xl,
+          borderRadius: radius.lg,
+          borderWidth: variant === 'ghost' ? 1 : 0,
+          borderColor: palette.borderStrong,
+          backgroundColor: variant === 'danger' ? palette.danger : 'transparent',
+          opacity: off ? 0.5 : pressed ? 0.88 : 1,
+        },
+        style,
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={textColor} />
+      ) : (
+        <Row style={{ gap: 6 }}>
+          {icon ? <Ionicons name={icon} size={small ? 15 : 18} color={textColor} /> : null}
+          <Text style={{ color: textColor, fontSize: small ? 13 : 15, fontWeight: '600' }} numberOfLines={1}>
+            {title}
+          </Text>
+        </Row>
+      )}
+    </Pressable>
+  );
+}
+
+export function IconButton({
+  icon,
+  onPress,
+  size = 40,
+  color,
+  tone = 'default',
+  accessibilityLabel,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  size?: number;
+  color?: string;
+  tone?: 'default' | 'primary';
+  accessibilityLabel?: string;
+}) {
+  const { theme } = useTheme();
+  const { palette, primary, primaryText } = theme;
+  const isPrimary = tone === 'primary';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [
+        styles.iconBtn,
+        {
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          borderColor: isPrimary ? primary : palette.border,
+          backgroundColor: isPrimary ? primary : palette.surface,
+          opacity: pressed ? 0.75 : 1,
+        },
+      ]}
+    >
+      {isPrimary ? (
+        <LinearGradient
+          colors={[primary, alpha(primary, 0.8)]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill, { borderRadius: size / 2 }]}
+        />
+      ) : null}
+      <Ionicons name={icon} size={size * 0.48} color={color ?? (isPrimary ? primaryText : palette.text)} />
     </Pressable>
   );
 }
@@ -194,141 +321,176 @@ export function Field({
   value,
   onChangeText,
   placeholder,
+  hint,
   keyboardType,
   multiline,
   secureTextEntry,
   autoCapitalize = 'none',
+  autoFocus,
+  onSubmitEditing,
+  returnKeyType,
 }: {
-  label: string;
+  label?: string;
   value: string;
   onChangeText: (v: string) => void;
   placeholder?: string;
+  hint?: string;
   keyboardType?: KeyboardTypeOptions;
   multiline?: boolean;
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  autoFocus?: boolean;
+  onSubmitEditing?: () => void;
+  returnKeyType?: 'done' | 'go' | 'next' | 'search' | 'send';
 }) {
   const { theme } = useTheme();
   const { palette } = theme;
+  const [focused, setFocused] = React.useState(false);
   return (
-    <View style={{ marginBottom: 12 }}>
-      <Text style={[styles.fieldLabel, { color: palette.textDim }]}>{label}</Text>
-      <View style={{ borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: palette.glassBorder }}>
-        <BlurView intensity={24} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.glass }]} />
+    <View style={{ marginBottom: space.md }}>
+      {label ? (
+        <Text style={{ color: palette.textDim, fontSize: 12, fontWeight: '600', marginBottom: 6, marginLeft: 2 }}>
+          {label}
+        </Text>
+      ) : null}
+      <View
+        style={{
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: focused ? alpha(theme.primary, 0.65) : palette.border,
+          backgroundColor: palette.surfaceSunken,
+          overflow: 'hidden',
+        }}
+      >
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={palette.textDim}
+          placeholderTextColor={palette.textFaint}
           keyboardType={keyboardType}
           multiline={multiline}
           secureTextEntry={secureTextEntry}
           autoCapitalize={autoCapitalize}
           autoCorrect={false}
-          style={[styles.input, { color: palette.text }, multiline && { height: 80, textAlignVertical: 'top' }]}
+          autoFocus={autoFocus}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          onSubmitEditing={onSubmitEditing}
+          returnKeyType={returnKeyType}
+          style={[
+            styles.input,
+            { color: palette.text },
+            multiline && { minHeight: 92, textAlignVertical: 'top', paddingTop: 12 },
+          ]}
         />
       </View>
+      {hint ? <Text style={{ color: palette.textFaint, fontSize: 11, marginTop: 6, marginLeft: 2 }}>{hint}</Text> : null}
     </View>
   );
 }
 
-export function StatusPill({ text, color }: { text: string; color: string }) {
+export function Pill({
+  text,
+  color,
+  icon,
+}: {
+  text: string;
+  color?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+}) {
   const { theme } = useTheme();
-  const { palette } = theme;
+  const c = color ?? theme.primary;
   return (
-    <View style={[styles.pill, { backgroundColor: color + '2B', borderColor: color + '55' }]}>
-      <Text style={[styles.pillText, { color }]}>{text}</Text>
+    <View style={[styles.pill, { backgroundColor: alpha(c, 0.14), borderColor: alpha(c, 0.34) }]}>
+      {icon ? <Ionicons name={icon} size={11} color={c} style={{ marginRight: 4 }} /> : null}
+      <Text style={{ color: c, fontSize: 11, fontWeight: '700' }}>{text}</Text>
     </View>
   );
 }
 
-export function EmptyState({ icon, title, subtitle }: { icon: string; title: string; subtitle?: string }) {
+export function EmptyState({
+  icon,
+  title,
+  subtitle,
+  action,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
   const { theme } = useTheme();
   const { palette, primary } = theme;
   return (
     <View style={styles.empty}>
-      <View style={[styles.emptyIconBox, { backgroundColor: primary + '1F', borderColor: primary + '44' }]}>
-        <Text style={[styles.emptyIcon, { color: primary }]}>{icon}</Text>
+      <View style={[styles.emptyIcon, { backgroundColor: alpha(primary, 0.12), borderColor: alpha(primary, 0.28) }]}>
+        <Ionicons name={icon} size={26} color={primary} />
       </View>
-      <Text style={[styles.emptyTitle, { color: palette.text }]}>{title}</Text>
-      {subtitle ? <Text style={[styles.emptySub, { color: palette.textDim }]}>{subtitle}</Text> : null}
+      <Text style={{ color: palette.text, fontSize: 16, fontWeight: '700', marginTop: space.md }}>{title}</Text>
+      {subtitle ? (
+        <Text style={{ color: palette.textDim, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 6 }}>
+          {subtitle}
+        </Text>
+      ) : null}
+      {action ? <View style={{ marginTop: space.lg }}>{action}</View> : null}
     </View>
   );
 }
 
-export function Screen({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+export function Divider({ style }: { style?: StyleProp<ViewStyle> }) {
   const { theme } = useTheme();
-  return (
-    <View style={[{ flex: 1, backgroundColor: theme.palette.bg }, style]}>
-      <GlassBackdrop />
-      {children}
-    </View>
-  );
+  return <View style={[{ height: StyleSheet.hairlineWidth, backgroundColor: theme.palette.border }, style]} />;
 }
 
-function shade(hex: string, percent: number): string {
-  const n = hex.replace('#', '');
-  const num = parseInt(n, 16);
-  const amt = Math.round(2.55 * percent);
-  const r = Math.min(255, Math.max(0, (num >> 16) + amt));
-  const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt));
-  const b = Math.min(255, Math.max(0, (num & 0xff) + amt));
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-}
+export { space, radius, type };
 
 const styles = StyleSheet.create({
-  blob: { position: 'absolute' },
-  card: {
-    borderRadius: 20,
+  aurora: { position: 'absolute', borderRadius: 210 },
+  screen: { flex: 1 },
+  surface: {
+    borderRadius: radius.xl,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 12,
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 4,
   },
-  cardSheen: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1.5,
-  },
-  cardBody: { padding: 16 },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 8,
-    marginTop: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  surfaceInner: {},
   row: { flexDirection: 'row', alignItems: 'center' },
-  btnText: { fontWeight: '600' },
-  fieldLabel: { fontSize: 13, marginBottom: 6 },
-  input: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    minHeight: 44,
+  btnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  pill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-  },
-  pillText: { fontSize: 12, fontWeight: '600' },
-  empty: { alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
-  emptyIconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 22,
+  iconBtn: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    marginBottom: 12,
+    overflow: 'hidden',
   },
-  emptyIcon: { fontSize: 30 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
-  emptySub: { fontSize: 13, textAlign: 'center' },
+  input: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    minHeight: 48,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  empty: { alignItems: 'center', paddingVertical: 44, paddingHorizontal: space.xl },
+  emptyIcon: {
+    width: 62,
+    height: 62,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
 });

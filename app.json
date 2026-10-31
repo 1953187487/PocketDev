@@ -2,19 +2,25 @@
   "expo": {
     "name": "PocketDev",
     "slug": "pocketdev",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "scheme": "pocketdev",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "icon": "./assets/brand/icon.png",
+    "backgroundColor": "#080B16",
     "android": {
       "package": "com.pocketdev.app",
+      "versionCode": 2,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/adaptive-icon.png",
         "backgroundColor": "#0B1020"
       },
       "permissions": []
     },
-    "iosunused": false,
+    "androidStatusBar": {
+      "barStyle": "light-content"
+    },
     "ios": {
       "bundleIdentifier": "com.pocketdev.app",
       "supportsTablet": true
@@ -22,7 +28,20 @@
     "plugins": [
       "expo-router",
       "expo-updates",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/brand/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#080B16",
+          "dark": {
+            "backgroundColor": "#060912",
+            "image": "./assets/brand/splash-icon.png"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

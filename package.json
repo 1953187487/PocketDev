@@ -1,6 +1,6 @@
 {
   "name": "pocketdev",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "手机端 AI 开发工具（基于 chaitin/MonkeyCode 底层能力）",
   "main": "expo-router/entry",
   "scripts": {
@@ -19,7 +19,9 @@
     "expo-font": "~55.0.8",
     "expo-linear-gradient": "~55.0.18",
     "expo-router": "~55.0.16",
+    "expo-splash-screen": "~55.0.25",
     "expo-status-bar": "~55.0.6",
+    "expo-system-ui": "~55.0.22",
     "expo-updates": "~55.0.25",
     "react": "19.2.0",
     "react-dom": "19.2.0",
