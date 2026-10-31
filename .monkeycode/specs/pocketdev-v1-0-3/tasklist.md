@@ -1,0 +1,46 @@
+# 需求实施计划
+
+- [ ] 1. 重建 UI 底层（R9）
+  - [ ] 1.1 新建 `src/ui/tokens.ts` 定义间距/圆角/字号/动效/层级令牌
+  - [ ] 1.2 新建 `src/ui/theme.tsx` 浅深双色调色板与 `useTheme()`
+  - [ ] 1.3 新建 `src/ui/components.tsx` 基础组件（Screen/Surface/Button/Field/Pill/Sheet/ProgressBar/Segmented/ListRow/AnimatedBackdrop）
+  - [ ] 1.4 迁移主页/仓库/设置/引导到 `src/ui` 基础层，移除旧 `src/theme` 依赖
+  - [ ] 1.5 新增 Skia/极光/毛玻璃统一图形层组件
+- [ ] 2. 更多功能入口与本地工作区（R5, R6）
+  - [ ] 2.1 `app/(tabs)/_layout.tsx` 在仓库与设置间新增「更多」tab
+  - [ ] 2.2 新建 `app/(tabs)/more.tsx` 更多功能 Hub（功能应用/本地工作区/自动化入口）
+  - [ ] 2.3 `src/store/app.tsx` 工作区支持 `kind: git|local` 与 `localWorkspace` 持久化
+  - [ ] 2.4 本地目录选择器（SAF）选择目录作为工作区并携带路径上下文
+- [ ] 3. 功能应用 Applet（R8）
+  - [ ] 3.1 新建 `src/api/applets.ts`：`AppletDef` 持久化、注册表、参数校验、安全调用
+  - [ ] 3.2 `app/applets/index.tsx` 列表页（启用/停用/删除/新建）
+  - [ ] 3.3 `app/applets/[id].tsx` 代码编辑器 + 运行 + 参数定义
+  - [ ] 3.4 在对话运行时接入 Applet 调用，并在消息流展示调用与结果
+- [ ] 4. AI 交互流（R3）
+  - [ ] 4.1 主页实现流动式输出渲染
+  - [ ] 4.2 实现计划模式：开关 + 先出计划再确认执行
+  - [ ] 4.3 待发送消息队列：第一条结束自动发送第二条
+  - [ ] 4.4 队列中的「立即发送」与「停止对话」操作
+- [ ] 5. 更新体验（R1）
+  - [ ] 5.1 更新检测/下载界面增加下载进度条实时更新
+  - [ ] 5.2 安装阶段输出安装包就绪与唤起安装器状态
+  - [ ] 5.3 检测新版本时以更新动画过渡并展示更新公告
+  - [ ] 5.4 `src/api/updates.ts` 读取 Release 描述作为更新公告正文
+- [ ] 6. 引导与修复（R2, R4）
+  - [ ] 6.1 引导协议步骤支持展开/收起全文
+  - [ ] 6.2 本地模型通过自带链接直接下载并在失败时提示
+  - [ ] 6.3 引导与设置的服务商配置统一提供「拉取模型」操作
+- [ ] 7. 手机自动化骨架（R7）
+  - [ ] 7.1 新建 `src/api/device.ts`：Shizuku/Dhizuku 权限检测与状态接口
+  - [ ] 7.2 新建原生模块 `DeviceBridge`（Java）骨架：adb 权限探测、应用启动、界面读取、单条消息发送
+  - [ ] 7.3 自动化任务入口 UI：逐条确认执行设备写操作
+  - [ ]* 7.4 真机接入用例清单与 Shizuku/Dhizuku 启动脚本
+- [ ] 8. Android 8–17 适配与底层优化（R9.5）
+  - [ ] 8.1 `app.json` minSdk 26、targetSdk 36+ 配置
+  - [ ] 8.2 清理旧 `src/components/ui.tsx` 与旧 theme 引用，统一收敛到 `src/ui`
+- [ ] 9. 检查点 - 确保所有测试通过
+  - 确保 `npx tsc --noEmit` 与 `gradlew assembleRelease` 通过，如有疑问请询问用户
+- [ ] 10. 版本构建发布
+  - [ ] 10.1 版本升至 1.0.3（versionCode 4）
+  - [ ] 10.2 构建 + zipalign + 正式签名 + 校验
+  - [ ] 10.3 提交、打 tag v1.0.3、创建 Release 并上传 APK
