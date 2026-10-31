@@ -1,9 +1,9 @@
+import { AuroraBackdrop, Divider, Pill, SectionLabel } from '@/ui';
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { AuroraBackdrop, Divider, Pill, SectionLabel } from '@/components/ui';
 import { useAppStore } from '@/store/app';
 import { APP_VERSION } from '@/config';
 

@@ -4,8 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import NetInfo from '@react-native-community/netinfo';
 import { alpha, useTheme } from '@/theme';
-import { Button } from '@/components/ui';
-import { ProgressBar, UpdateTransition, GlassPane } from '@/ui';
+import { ProgressBar, UpdateTransition, GlassPane, Button } from '@/ui';
 import { downloadApk, installApk, type ReleaseInfo } from '@/api/updates';
 import { APP_REPO_URL } from '@/config';
 

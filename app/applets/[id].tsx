@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Field, SubScreen } from '@/components/ui';
-import { Collapsible, space, type, useTheme } from '@/ui';
+import { Collapsible, space, type, useTheme, Button, Field, SubScreen } from '@/ui';
 import { buildArgs, loadApplets, runApplet, saveApplets, type AppletDef, type AppletParam } from '@/api/applets';
 import { useAppStore } from '@/store/app';
 

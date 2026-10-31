@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Button, Pill, SubScreen } from '@/components/ui';
-import { Collapsible, ListRow, space, type, useTheme } from '@/ui';
+import { Collapsible, ListRow, space, type, useTheme, Button, Pill, SubScreen } from '@/ui';
 import { emptyApplet, loadApplets, saveApplets, type AppletDef } from '@/api/applets';
 
 export default function AppletListScreen() {

@@ -2,8 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AuroraBackdrop } from '@/components/ui';
-import { ListRow, space, type, useTheme } from '@/ui';
+import { ListRow, space, type, useTheme, AuroraBackdrop } from '@/ui';
 import { useAppStore } from '@/store/app';
 import { loadApplets } from '@/api/applets';
 

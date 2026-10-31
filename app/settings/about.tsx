@@ -1,9 +1,9 @@
+import { Divider, Pill, Row, SubScreen } from '@/ui';
 import React from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { Divider, Pill, Row, SubScreen } from '@/components/ui';
 import { DonationSection } from '@/components/DonationSection';
 import { CONTRIBUTORS, DEVELOPERS, APP_VERSION, APP_REPO_URL, MAIN_DEVELOPER } from '@/config';
 

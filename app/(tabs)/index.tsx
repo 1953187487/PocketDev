@@ -1,3 +1,4 @@
+import { AuroraBackdrop } from '@/ui';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -16,7 +17,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { AuroraBackdrop } from '@/components/ui';
 import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak, stopSpeaking } from '@/api/speech';

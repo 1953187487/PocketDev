@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { alpha, space, type, useTheme } from '@/ui';
-import { Button, SubScreen } from '@/components/ui';
+import { alpha, space, type, useTheme, Button, SubScreen } from '@/ui';
 import {
   getDeviceBridgeStatus,
   performDeviceAction,

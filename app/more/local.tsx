@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Button, Field, SubScreen } from '@/components/ui';
-import { space, type, useTheme } from '@/ui';
+import { space, type, useTheme, Button, Field, SubScreen } from '@/ui';
 import { useAppStore, type Workspace } from '@/store/app';
 import { COMMON_DIRS, inspectDir, listDir, type LocalDirInfo } from '@/api/localfs';
 

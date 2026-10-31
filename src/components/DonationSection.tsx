@@ -1,9 +1,9 @@
+import { Row, SectionLabel, Spacer, Surface } from '@/ui';
 import React, { useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { alpha, radius, useTheme } from '@/theme';
-import { Row, SectionLabel, Spacer, Surface } from '@/components/ui';
 import { DONATION, MAIN_DEVELOPER } from '@/config';
 
 function QrModal({

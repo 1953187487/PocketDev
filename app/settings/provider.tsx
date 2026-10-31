@@ -1,9 +1,9 @@
+import { Button, Divider, Field, Pill, Row, SubScreen } from '@/ui';
 import React, { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { Button, Divider, Field, Pill, Row, SubScreen } from '@/components/ui';
 import { listRemoteModels, testProvider } from '@/api/ai';
 import { useAppStore, type InterfaceType } from '@/store/app';
 

@@ -1,8 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Linking, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { space, useTheme } from '@/ui';
-import { Button, Pill, Row, SubScreen } from '@/components/ui';
+import { space, useTheme, Button, Pill, Row, SubScreen } from '@/ui';
 import { ProgressBar, UpdateTransition, Collapsible } from '@/ui';
 import { useAppStore } from '@/store/app';
 import { checkForUpdate, downloadApk, installApk, type ReleaseInfo } from '@/api/updates';

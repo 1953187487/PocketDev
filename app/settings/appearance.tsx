@@ -1,9 +1,9 @@
+import { Divider, Row, SubScreen } from '@/ui';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ACCENTS, alpha, radius, space, useTheme, type ThemeMode } from '@/theme';
-import { Divider, Row, SubScreen } from '@/components/ui';
 import { useAppStore, type AppLanguage } from '@/store/app';
 
 const MODES: { key: ThemeMode; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [

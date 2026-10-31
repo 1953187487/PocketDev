@@ -1,9 +1,9 @@
+import { Button, Divider, Pill, Row, SubScreen } from '@/ui';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { Button, Divider, Pill, Row, SubScreen } from '@/components/ui';
 import { AGREEMENTS } from '@/agreements';
 import { useAppStore } from '@/store/app';
 import { APP_REPO_URL } from '@/config';
