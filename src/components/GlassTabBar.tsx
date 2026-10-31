@@ -1,9 +1,10 @@
-import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, useTheme } from '@/theme';
+import { useAppStore } from '@/store/app';
 
 export interface TabBarProps {
   state: { routes: { key: string; name: string; params?: Record<string, unknown> }[]; index: number };
@@ -18,6 +19,16 @@ export function GlassTabBar(props: TabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 10);
   const { state, navigation } = props;
+  const { tabBarVisible } = useAppStore();
+
+  const anim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: tabBarVisible ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [tabBarVisible, anim]);
 
   const focus = (key: string, route: { key: string; name: string }) => {
     const event = navigation.emit({ target: key, type: 'tabPress' });
@@ -25,7 +36,14 @@ export function GlassTabBar(props: TabBarProps) {
   };
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { paddingBottom: bottomPad }]}>
+    <Animated.View
+      pointerEvents={tabBarVisible ? 'box-none' : 'none'}
+      style={[
+        styles.wrap,
+        { paddingBottom: bottomPad },
+        { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [90, 0] }) }] },
+      ]}
+    >
       <View style={styles.frame}>
         <BlurView
           intensity={palette.mode === 'dark' ? 46 : 62}
@@ -68,7 +86,7 @@ export function GlassTabBar(props: TabBarProps) {
           })}
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

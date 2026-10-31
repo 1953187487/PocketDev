@@ -63,6 +63,9 @@ interface AppStore {
   addWorkspace: (w: Omit<Workspace, 'id'>) => Workspace;
   updateWorkspace: (id: string, patch: Partial<Workspace>) => void;
   removeWorkspace: (id: string) => void;
+
+  tabBarVisible: boolean;
+  setTabBarVisible: (v: boolean) => void;
 }
 
 const Ctx = createContext<AppStore | null>(null);
@@ -78,6 +81,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [activeWorkspaceId, setActiveId] = useState<string | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [gitReady, setGitReady] = useState(false);
+  const [tabBarVisible, setTabBarVisible] = useState(true);
   const hydrated = useRef(false);
 
   useEffect(() => {
@@ -163,6 +167,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       addWorkspace,
       updateWorkspace,
       removeWorkspace,
+      tabBarVisible,
+      setTabBarVisible,
     }),
     [
       provider,
@@ -177,6 +183,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       addWorkspace,
       updateWorkspace,
       removeWorkspace,
+      tabBarVisible,
+      setTabBarVisible,
     ],
   );
 

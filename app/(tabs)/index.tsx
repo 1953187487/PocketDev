@@ -38,7 +38,7 @@ export default function ChatScreen() {
   const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
-  const { provider, providerReady, workspaces } = useAppStore();
+  const { provider, providerReady, workspaces, setTabBarVisible } = useAppStore();
   const activeWs = useActiveWorkspace();
 
   const [messages, setMessages] = useState<Bubble[]>([]);
@@ -52,13 +52,20 @@ export default function ChatScreen() {
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    const kShow = Keyboard.addListener('keyboardDidShow', () => setKeyboardOn(true));
-    const kHide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOn(false));
+    const kShow = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardOn(true);
+      setTabBarVisible(false);
+    });
+    const kHide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardOn(false);
+      setTabBarVisible(true);
+    });
     return () => {
       kShow.remove();
       kHide.remove();
+      setTabBarVisible(true);
     };
-  }, []);
+  }, [setTabBarVisible]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -248,6 +255,9 @@ export default function ChatScreen() {
     );
   };
 
+  const TAB_BAR_HEIGHT = 58;
+  const composerPad = keyboardOn ? Math.max(insets.bottom, 8) : TAB_BAR_HEIGHT + Math.max(insets.bottom, 10) + 12;
+
   return (
     <View style={[styles.root, { backgroundColor: palette.bg }]}>
       <AuroraBackdrop />
@@ -260,7 +270,7 @@ export default function ChatScreen() {
         ListEmptyComponent={renderEmpty}
         contentContainerStyle={[
           styles.listContent,
-          { paddingBottom: keyboardOn ? 120 : 108 },
+          { paddingBottom: keyboardOn ? 120 : composerPad + 116 },
           messages.length === 0 && { flexGrow: 1 },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -270,7 +280,7 @@ export default function ChatScreen() {
         }}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
-        <View style={[styles.composer, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+        <View style={[styles.composer, { paddingBottom: composerPad }]}>
           <View style={[styles.composerBox, { borderColor: palette.border, backgroundColor: palette.surfaceRaised.startsWith('#') && palette.mode === 'dark' ? palette.surfaceRaised : palette.surface }]}>
             <TextInput
               ref={inputRef}
