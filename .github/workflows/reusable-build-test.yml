@@ -1,0 +1,104 @@
+name: Reusable Build & Test
+
+# 自动检查：TypeScript 类型检查、Lint、Jest 测试，结果聚合写成报告供人和 AI 直接读。
+# App 的设置都在 App 仓库的 .android-ci.yml；这里的输入只有每次运行时才决定的开关。
+on:
+  workflow_call:
+    inputs:
+      config:
+        description: Path of the App repository's config file
+        type: string
+        default: .android-ci.yml
+
+# 无工作流级权限：所有 job 固定 contents: read，写仓库或开 Issue 的 job 由入口文件给。
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      config: ${{ steps.read.outputs.config }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: read
+        env:
+          CONFIG_PATH: ${{ inputs.config }}
+        run: python3 scripts/ci/android-ci-config.py
+
+  build-test:
+    needs: config
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ${{ fromJSON(needs.config.outputs.config).workdir }}
+        shell: bash
+    env:
+      CONFIG: ${{ needs.config.outputs.config }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ fromJSON(needs.config.outputs.config).toolchain.node }}
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript typecheck
+        id: tc
+        run: |
+          set +e
+          mkdir -p build/ci
+          ( ${{ fromJSON(needs.config.outputs.config).build_test.typecheck_command }} ) 2>&1 | tee build/ci/typecheck.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Lint
+        id: lint
+        run: |
+          set +e
+          ( ${{ fromJSON(needs.config.outputs.config).build_test.lint_command }} ) 2>&1 | tee build/ci/lint.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Tests
+        id: test
+        run: |
+          set +e
+          ( ${{ fromJSON(needs.config.outputs.config).build_test.test_command }} ) 2>&1 | tee build/ci/test.log
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          echo "summary=$(grep -E 'Tests:' build/ci/test.log | tail -1 | sed 's/^[[:space:]]*//')" >> "$GITHUB_OUTPUT"
+      - name: Write test report
+        id: report
+        env:
+          TYPECHECK_EXIT: ${{ steps.tc.outputs.exit }}
+          TYPECHECK_LOG: build/ci/typecheck.log
+          LINT_EXIT: ${{ steps.lint.outputs.exit }}
+          LINT_LOG: build/ci/lint.log
+          TEST_EXIT: ${{ steps.test.outputs.exit }}
+          TEST_LOG: build/ci/test.log
+          TEST_SUMMARY: ${{ steps.test.outputs.summary }}
+          PASS_WITH_NO_TESTS: ${{ fromJSON(needs.config.outputs.config).build_test.pass_with_no_tests }}
+          REPORT_DIR: build/ci/report
+          WORKDIR: .
+        run: python3 scripts/ci/android-report.py
+      - name: Upload CI report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-ci-${{ github.run_number }}
+          path: ${{ fromJSON(needs.config.outputs.config).workdir }}/build/ci
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Apply pass/fail rules
+        if: always()
+        env:
+          PASSED: ${{ steps.report.outputs.passed }}
+        run: |
+          set -euo pipefail
+          if [ "$PASSED" != "true" ]; then
+            echo "::error::CI 未通过；见报告 build/ci/report/report.md"; exit 1
+          fi

@@ -37,6 +37,7 @@ export const CONTRIBUTORS: Contributor[] = [
   { name: 'MonkeyCode 开源社区', role: 'AI 能力 / API / 协议实现', link: 'https://github.com/chaitin/MonkeyCode' },
   { name: 'Expo', role: 'React Native 原生工程框架', link: 'https://expo.dev' },
   { name: 'React Native', role: '跨平台移动运行时', link: 'https://reactnative.dev' },
+  { name: 'ios-ci-workflows (wenjinliuu)', role: 'CI 架构借鉴（AI+Actions 报告闭环，MIT）', link: 'https://github.com/wenjinliuu/ios-ci-workflows' },
   { name: 'PocketDev Contributors', role: '本项目贡献者', link: 'https://github.com/1953187487/PocketDev' },
 ];
 

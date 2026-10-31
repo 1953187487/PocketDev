@@ -1,0 +1,30 @@
+name: Release
+
+# 只在推送 v* 标签或手动触发时运行。发出去的一定是测过的（复用该提交的 Build & Test 结果）。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      config:
+        description: 配置文件路径
+        type: string
+        default: .android-ci.yml
+      tag:
+        description: 发布标签（手动运行时，留空则用 app.json 版本）
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: ./.github/workflows/reusable-release.yml
+    with:
+      config: ${{ inputs.config || '.android-ci.yml' }}
+    secrets:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}

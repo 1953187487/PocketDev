@@ -36,7 +36,8 @@
 - Expo SDK 55 / React Native 0.83
 - expo-router（文件路由）
 - expo-blur / expo-linear-gradient（液态玻璃 + 极光背景）
-- TypeScript
+- TypeScript / Jest / ESLint
+- GitHub Actions（Android CI，构建/测试/发布全自动）
 - AGPL-3.0
 
 ## 兼容环境
@@ -50,18 +51,26 @@ npm install
 npx expo start
 ```
 
-## 构建 APK
+## 持续集成（Android CI）
 
-```bash
-# 本地构建（需 JDK 17 + Android SDK）
-cd android && ./gradlew assembleRelease
+本项目用自带的 **GitHub Actions** 完成编译、测试、报告和发布，本地不跑 Gradle 构建，配置全部写在根目录 [`.android-ci.yml`](.android-ci.yml)：
 
-# 或使用 EAS 云端构建
-npx eas build --platform android --profile production
-```
+- **Build & Test**（`.github/workflows/build-test.yml`）：每次 push / PR 自动跑 `tsc --noEmit` + `expo lint` + `jest`，结果聚合成人机可读报告（`report.md` / `report.json`）并作为产物上传，写进运行摘要，供 AI 直接读。
+- **Release**（`.github/workflows/release.yml`）：打 `v*` 标签或手动触发 → `expo prebuild` → Gradle 打签名 APK（签名密钥来自仓库 Secrets）→ 计算 SHA-256 → 上传 GitHub Release。
 
-产物为 `com.pocketdev.app` 的 APK。
+### AI 协作闭环
+
+手机上的 AI 改代码 → push → 读 **Build & Test** 报告 → 修 → 再 push → 打 `v*` 标签 → CI 自动构建签名 APK 并发布。规则见 [`AGENTS.md`](AGENTS.md)，机制说明见 [`docs/android-ci.md`](docs/android-ci.md)。
+
+### 发布前需要配置的 Secrets
+
+在仓库 Settings → Secrets and variables → Actions 中添加（签名密钥，不进代码库）：
+
+- `ANDROID_KEYSTORE_BASE64`：`.jks` keystore 的 base64（`base64 -w0 release.jks`）
+- `ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`
 
 ## 许可
 
 AGPL-3.0。底层 MonkeyCode 亦为 AGPL-3.0（长亭科技 / Chaitin 出品）。
+
+本项目的 CI 架构（配置驱动 + AI 报告闭环 + 薄入口复用工作流）借鉴自 [wenjinliuu/ios-ci-workflows](https://github.com/wenjinliuu/ios-ci-workflows)（MIT License），已由 iOS 移植为 Android 实现。

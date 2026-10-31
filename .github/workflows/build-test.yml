@@ -1,0 +1,27 @@
+name: Build & Test
+
+on:
+  push:
+    paths-ignore: ['**/*.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**/*.md', 'docs/**']
+  workflow_dispatch:
+    inputs:
+      config:
+        description: 配置文件路径
+        type: string
+        default: .android-ci.yml
+
+permissions:
+  contents: read
+
+# 新提交取消还在跑的旧运行；main 上每次推送都跑完，供 Release 复用
+concurrency:
+  group: build-test-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build-test:
+    uses: ./.github/workflows/reusable-build-test.yml
+    with:
+      config: ${{ inputs.config || '.android-ci.yml' }}
