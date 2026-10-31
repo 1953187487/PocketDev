@@ -20,6 +20,9 @@ import { AuroraBackdrop } from '@/components/ui';
 import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak, stopSpeaking } from '@/api/speech';
+import { loadApplets, runApplet, buildArgs } from '@/api/applets';
+import { inspectDir, listDir } from '@/api/localfs';
+import type { ProviderConfig } from '@/store/app';
 
 interface Bubble {
   id: string;
@@ -27,6 +30,10 @@ interface Bubble {
   text: string;
   streaming?: boolean;
   error?: boolean;
+  /** 计划模式：AI 返回的是待确认执行计划。 */
+  plan?: boolean;
+  /** Applet 调用结果展示。 */
+  tool?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -36,11 +43,28 @@ const SUGGESTIONS = [
   { icon: 'search' as const, title: '解释代码', prompt: '解释这段代码的作用和实现思路' },
 ];
 
+/** 解析 AI 输出中的功能应用调用标记：@CALL: 名称 {"k":"v"} */
+function parseCall(text: string): { name: string; args: Record<string, string> } | null {
+  const m = text.match(/@CALL:\s*([^\s{]+)(\s*\{[\s\S]*?\})?/);
+  if (!m) return null;
+  let args: Record<string, string> = {};
+  if (m[2]) {
+    try {
+      const j = JSON.parse(m[2]);
+      for (const k of Object.keys(j)) args[k] = String(j[k]);
+    } catch {
+      /* ignore */
+    }
+  }
+  return { name: m[1], args };
+}
+
 export default function ChatScreen() {
   const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
-  const { provider, providerReady, workspaces, setTabBarVisible, prefs } = useAppStore();
+  const { provider, providerReady, workspaces, setTabBarVisible, prefs, setPrefs } = useAppStore();
+  const planMode = prefs.planMode;
   const activeWs = useActiveWorkspace();
 
   const [messages, setMessages] = useState<Bubble[]>([]);
@@ -51,9 +75,16 @@ export default function ChatScreen() {
   const [scrollToBottom, setScrollToBottom] = useState(0);
   const [translateMsg, setTranslateMsg] = useState<{ text: string; result: string; lang: string } | null>(null);
   const [translating, setTranslating] = useState(false);
+  const [pending, setPending] = useState<string | null>(null);
+  const [wsContext, setWsContext] = useState('');
+  const [planAwaiting, setPlanAwaiting] = useState<string | null>(null);
   const listRef = useRef<FlatList<Bubble>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
+  const messagesRef = useRef<Bubble[]>([]);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     const kShow = Keyboard.addListener('keyboardDidShow', () => {
@@ -73,6 +104,42 @@ export default function ChatScreen() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  const [applets, setApplets] = useState<import('@/api/applets').AppletDef[]>([]);
+  useEffect(() => {
+    (async () => {
+      const list = await loadApplets();
+      setApplets(list.filter((a) => a.enabled));
+    })();
+  }, []);
+
+  // 预计算工作区上下文（本地目录列出文件清单，远端仓库携带仓库信息）。
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      if (!activeWs) {
+        setWsContext('');
+        return;
+      }
+      if (activeWs.kind === 'local' && activeWs.root) {
+        const info = await inspectDir(activeWs.root);
+        const files = info.readable ? await listDir(activeWs.root, 80) : [];
+        if (!alive) return;
+        setWsContext(
+          `当前工作区是手机本地目录：${activeWs.root}（${info.readable ? `${info.entries} 个条目` : '不可读'}）\n目录中的文件（前 ${files.length} 项）：\n${files.map((f) => `- ${f}`).join('\n')}`,
+        );
+      } else if (activeWs.repoFullName) {
+        if (!alive) return;
+        setWsContext(`当前工作区：${activeWs.name}（仓库：${activeWs.repoFullName}${activeWs.branch ? `，分支 ${activeWs.branch}` : ''}）`);
+      } else {
+        if (!alive) return;
+        setWsContext(`当前工作区：${activeWs.name}`);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [activeWs]);
+
   const append = useCallback((b: Bubble) => {
     setMessages((prev) => [...prev, b]);
   }, []);
@@ -86,47 +153,46 @@ export default function ChatScreen() {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
 
-  const systemPrompt = useCallback(
-    (ws: Workspace | null) => {
-      const parts = [
-        '你是 PocketDev 内置的 AI 开发助手，专业、可靠、语言与用户保持一致（默认使用中文）。',
-        '请给出结构清晰、可直接使用的回答；涉及代码时用 Markdown 代码块，并注明语言。',
-      ];
-      if (ws) {
-        parts.push(`当前工作区：${ws.name}${ws.repoFullName ? `（仓库：${ws.repoFullName}${ws.branch ? `，分支 ${ws.branch}` : ''}）` : ''}。回答时优先结合该仓库上下文。`);
-      }
-      return parts.join('\n');
-    },
-    [],
-  );
+  const systemPrompt = useCallback(() => {
+    const parts = [
+      '你是 PocketDev 内置的 AI 开发助手，专业、可靠、语言与用户保持一致（默认使用中文）。',
+      '请给出结构清晰、可直接使用的回答；涉及代码时用 Markdown 代码块，并注明语言。',
+    ];
+    if (wsContext) parts.push(`${wsContext}\n回答时优先结合该工作区上下文。`);
+    if (applets.length) {
+      const list = applets
+        .map((a) => `- ${a.name}（参数：${a.params.map((p) => p.key).join(', ') || '无'}）：${a.description || '无说明'}`)
+        .join('\n');
+      parts.push(
+        '你可以调用以下功能应用。需要调用时，单独一行输出标记：@CALL: 名称 以及参数键值对（JSON）。系统会执行并把结果反馈给你，然后你继续回答。仅使用列出的功能应用。\n可用功能应用：\n' +
+          list,
+      );
+    }
+    if (planMode) {
+      parts.push('当前处于计划模式：先输出编号的分步骤执行计划，结尾询问「是否按计划执行？」，等待确认后再实现细节。');
+    }
+    return parts.join('\n');
+  }, [wsContext, applets, planMode]);
 
-  const send = useCallback(
-    async (text: string) => {
-      const content = text.trim();
-      if (!content || sending) return;
-      if (!provider.apiKey.trim()) {
-        append({ id: `sys-${Date.now()}`, role: 'assistant', text: '尚未配置服务商。请前往「设置 → 自定义服务商」填写 API Key 与模型。', error: true });
-        setWsOpen(true);
-        return;
-      }
-      setInput('');
-      append({ id: `u-${Date.now()}`, role: 'user', text: content });
-      const aid = `a-${Date.now()}`;
+  const runTurn = useCallback(
+    async (content: string, historySrc: Bubble[]) => {
+      const aid = `a-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
       append({ id: aid, role: 'assistant', text: '', streaming: true });
       setSending(true);
       scrollToEnd();
 
-      const history = messages
-        .filter((m) => !m.error)
+      const history = historySrc
+        .filter((m) => !m.error && !m.tool)
         .map((m) => ({ role: m.role, content: m.text }))
         .slice(-14);
       const controller = new AbortController();
       abortRef.current = controller;
+      let full = '';
 
       try {
-        const full = await streamChat(
+        full = await streamChat(
           provider,
-          [{ role: 'system', content: systemPrompt(activeWs) }, ...history, { role: 'user', content }],
+          [{ role: 'system', content: systemPrompt() }, ...history, { role: 'user', content }],
           {
             signal: controller.signal,
             onDelta: (d) => {
@@ -135,31 +201,113 @@ export default function ChatScreen() {
             },
           },
         );
-        patch(aid, (b) => ({ ...b, text: full, streaming: false }));
+        patch(aid, (b) => ({ ...b, text: full, streaming: false, plan: planMode || undefined }));
+        if (planMode) setPlanAwaiting(aid);
+
+        const call = parseCall(full);
+        if (call && !planMode) {
+          const applet = applets.find((a) => a.name === call.name);
+          const tid = `t-${Date.now()}`;
+          if (!applet) {
+            append({ id: tid, role: 'assistant', text: `未找到功能应用「${call.name}」，请检查名称。`, error: true, tool: true });
+          } else {
+            append({ id: tid, role: 'assistant', text: `调用功能应用「${applet.name}」…`, tool: true, streaming: true });
+            const r = await runApplet(applet, provider, buildArgs(applet.params, call.args));
+            const out = r.ok
+              ? typeof r.value === 'string'
+                ? r.value
+                : JSON.stringify(r.value, null, 2)
+              : `失败：${r.error}`;
+            patch(tid, (b) => ({ ...b, text: `功能应用「${applet.name}」结果：\n${out}`, streaming: false }));
+            setSending(false);
+            abortRef.current = null;
+            await runTurn(
+              `功能应用「${applet.name}」已执行，结果如下：\n${out}\n请基于该结果继续回答。`,
+              [
+                ...historySrc,
+                { id: aid, role: 'assistant', text: full },
+                { id: tid, role: 'assistant', text: `功能应用结果：${out}`, tool: true },
+              ],
+            );
+            return;
+          }
+        }
       } catch (e) {
         const err = e as Error;
         patch(aid, (b) => ({
           ...b,
-          text: err instanceof ChatError ? err.message : '请求失败，请检查网络或服务商配置',
+          text:
+            err.name === 'AbortError'
+              ? `${b.text || ''}${b.text ? '\n' : ''}（已停止）`
+              : err instanceof ChatError
+                ? err.message
+                : '请求失败，请检查网络或服务商配置',
           streaming: false,
-          error: true,
+          error: err.name === 'AbortError' ? undefined : true,
         }));
       } finally {
         setSending(false);
         abortRef.current = null;
       }
     },
-    [sending, provider, messages, activeWs, append, patch, scrollToEnd, systemPrompt],
+    [append, patch, scrollToEnd, provider, systemPrompt, applets, planMode],
   );
+
+  const send = useCallback(
+    async (text: string) => {
+      const content = text.trim();
+      if (!content) return;
+      if (!provider.apiKey.trim()) {
+        append({ id: `sys-${Date.now()}`, role: 'assistant', text: '尚未配置服务商。请前往「设置 → 自定义服务商」填写 API Key 与模型。', error: true });
+        setWsOpen(true);
+        return;
+      }
+      setInput('');
+      append({ id: `u-${Date.now()}`, role: 'user', text: content });
+      if (sending) {
+        setPending(content);
+        return;
+      }
+      await runTurn(content, messagesRef.current);
+    },
+    [provider, sending, append, runTurn],
+  );
+
+  // 当前回复结束后自动发送排队中的消息。
+  useEffect(() => {
+    if (sending || !pending) return;
+    const next = pending;
+    setPending(null);
+    void runTurn(next, messagesRef.current);
+  }, [sending, pending, runTurn]);
+
+  const sendNow = useCallback(() => {
+    if (!pending) return;
+    const next = pending;
+    setPending(null);
+    abortRef.current?.abort();
+    append({ id: `u-${Date.now()}`, role: 'user', text: next });
+    setSending(false);
+    requestAnimationFrame(() => void runTurn(next, messagesRef.current));
+  }, [pending, append, runTurn]);
+
+  const confirmPlan = useCallback(() => {
+    setPlanAwaiting(null);
+    void send('请按上面的计划开始执行。');
+  }, [send]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
     setSending(false);
+    setPending(null);
+    setPlanAwaiting(null);
   }, []);
 
   const clearChat = useCallback(() => {
     setMessages([]);
     setSending(false);
+    setPending(null);
+    setPlanAwaiting(null);
   }, []);
 
   const doTranslate = useCallback(
@@ -215,6 +363,28 @@ export default function ChatScreen() {
         </View>
       </View>
       <View style={styles.headerActions}>
+        <Pressable
+          onPress={() => setPrefs({ planMode: !prefs.planMode })}
+          style={[
+            styles.wsChip,
+            { borderColor: prefs.planMode ? alpha(primary, 0.5) : palette.border },
+          ]}
+        >
+          <Ionicons
+            name={prefs.planMode ? 'list-circle' : 'list-circle-outline'}
+            size={13}
+            color={prefs.planMode ? primary : palette.textFaint}
+          />
+          <Text
+            style={{
+              color: prefs.planMode ? primary : palette.textFaint,
+              fontSize: 12,
+              fontWeight: '600',
+            }}
+          >
+            计划
+          </Text>
+        </Pressable>
         <Pressable
           onPress={() => setWsOpen(true)}
           style={[styles.wsChip, { borderColor: activeWs ? alpha(primary, 0.5) : palette.border }]}
@@ -310,6 +480,18 @@ export default function ChatScreen() {
               ) : null}
             </View>
           ) : null}
+          {item.plan && planAwaiting === item.id ? (
+            <Pressable
+              onPress={confirmPlan}
+              style={[
+                styles.planConfirm,
+                { borderColor: alpha(primary, 0.55), backgroundColor: alpha(primary, 0.12) },
+              ]}
+            >
+              <Ionicons name="play-circle" size={15} color={primary} />
+              <Text style={{ color: primary, fontSize: 13, fontWeight: '700' }}>确认执行计划</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     );
@@ -341,6 +523,20 @@ export default function ChatScreen() {
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
         <View style={[styles.composer, { paddingBottom: composerPad }]}>
+          {pending ? (
+            <View style={[styles.pendingBar, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+              <Ionicons name="time-outline" size={14} color={palette.textFaint} />
+              <Text style={{ color: palette.textDim, fontSize: 12, flex: 1 }} numberOfLines={1}>
+                待发送：{pending}
+              </Text>
+              <Pressable
+                onPress={sendNow}
+                style={[styles.pendingBtn, { backgroundColor: alpha(primary, 0.14), borderColor: alpha(primary, 0.45) }]}
+              >
+                <Text style={{ color: primary, fontSize: 12, fontWeight: '700' }}>立即发送</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <View style={[styles.composerBox, { borderColor: palette.border, backgroundColor: palette.surfaceRaised.startsWith('#') && palette.mode === 'dark' ? palette.surfaceRaised : palette.surface }]}>
             <TextInput
               ref={inputRef}
@@ -593,6 +789,33 @@ const styles = StyleSheet.create({
   bubbleUser: { borderBottomRightRadius: 6 },
   bubbleAi: { borderBottomLeftRadius: 6, borderWidth: 1 },
   msgActions: { flexDirection: 'row', gap: 12, marginTop: 6, paddingHorizontal: 2 },
+  planConfirm: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  pendingBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  pendingBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
   msgAction: { paddingVertical: 2 },
   dots: { flexDirection: 'row', gap: 5, height: 20, alignItems: 'center' },
   dot: { width: 7, height: 7, borderRadius: 4 },

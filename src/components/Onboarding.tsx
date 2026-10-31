@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { AuroraBackdrop, Button, Field, Pill } from '@/components/ui';
+import { Collapsible } from '@/ui';
+import { listRemoteModels } from '@/api/ai';
 import { useAppStore, type AppLanguage, type InterfaceType } from '@/store/app';
 import { useI18n } from '@/i18n';
 import { checkForUpdate } from '@/api/updates';
@@ -28,11 +30,38 @@ export function Onboarding() {
   const [envState, setEnvState] = useState<'idle' | 'checking' | 'ready'>('idle');
   const [envMsg, setEnvMsg] = useState('');
   const [agree, setAgree] = useState<Record<string, boolean>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [remoteModels, setRemoteModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [modelMsg, setModelMsg] = useState('');
 
   const [baseUrl, setBaseUrl] = useState(provider.baseUrl);
   const [apiKey, setApiKey] = useState(provider.apiKey);
   const [model, setModel] = useState(provider.model);
   const [iface, setIface] = useState<InterfaceType>(provider.interfaceType);
+
+  const fetchModels = useCallback(async () => {
+    if (!apiKey.trim()) {
+      setModelMsg('请先填写 API Key');
+      return;
+    }
+    setFetchingModels(true);
+    setModelMsg('');
+    try {
+      const list = await listRemoteModels({ baseUrl, apiKey });
+      if (list.length === 0) {
+        setModelMsg('未获取到模型列表，请检查 Base URL 与 Key');
+      } else {
+        setRemoteModels(list);
+        setModelMsg(`已拉取 ${list.length} 个模型，点选填入`);
+        if (!model) setModel(list[0]);
+      }
+    } catch (e) {
+      setModelMsg((e as Error).message || '拉取失败');
+    } finally {
+      setFetchingModels(false);
+    }
+  }, [apiKey, baseUrl, model]);
 
   const checkEnv = useCallback(async () => {
     setEnvState('checking');
@@ -170,6 +199,25 @@ export function Onboarding() {
               <Field label="Base URL" value={baseUrl} onChangeText={setBaseUrl} placeholder="https://api.deepseek.com/v1" keyboardType="url" />
               <Field label="API Key" value={apiKey} onChangeText={setApiKey} placeholder="sk-..." secureTextEntry />
               <Field label="模型名称" value={model} onChangeText={setModel} placeholder="deepseek-chat" />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Button title="拉取模型列表" small variant="secondary" loading={fetchingModels} onPress={fetchModels} icon="cloud-download-outline" />
+                </View>
+              </View>
+              {modelMsg ? <Text style={{ color: palette.textDim, fontSize: 12 }}>{modelMsg}</Text> : null}
+              {remoteModels.length ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {remoteModels.slice(0, 40).map((m) => (
+                    <Pressable
+                      key={m}
+                      onPress={() => setModel(m)}
+                      style={[styles.seg, { borderColor: model === m ? primary : palette.border, backgroundColor: model === m ? alpha(primary, 0.12) : palette.surfaceSunken }]}
+                    >
+                      <Text style={{ color: model === m ? primary : palette.textDim, fontSize: 12 }}>{m}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
           </>
         ) : null}
@@ -180,24 +228,30 @@ export function Onboarding() {
             <View style={{ marginTop: 18, gap: 10 }}>
               {AGREEMENTS.map((a) => {
                 const on = !!agree[a.key];
+                const open = !!expanded[a.key];
                 return (
-                  <Pressable
-                    key={a.key}
-                    onPress={() => setAgree((prev) => ({ ...prev, [a.key]: !prev[a.key] }))}
-                    style={[styles.card, { borderColor: on ? primary : palette.border, backgroundColor: palette.surface }]}
-                  >
-                    <View style={[styles.checkbox, { borderColor: on ? primary : palette.border, backgroundColor: on ? primary : 'transparent' }]}>
-                      {on ? <Ionicons name="checkmark" size={15} color={primaryText} /> : null}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: palette.text, fontSize: 15, fontWeight: '700' }}>{a.title}</Text>
-                      <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 17 }} numberOfLines={2}>
-                        {a.body}
-                      </Text>
-                    </View>
-                  </Pressable>
+                  <View key={a.key} style={{ gap: 6 }}>
+                    <Collapsible
+                      title={a.title}
+                      body={a.body}
+                      expanded={open}
+                      onToggle={() => setExpanded((prev) => ({ ...prev, [a.key]: !prev[a.key] }))}
+                      trailing={
+                        <Pressable
+                          hitSlop={10}
+                          onPress={() => setAgree((prev) => ({ ...prev, [a.key]: !prev[a.key] }))}
+                          style={[styles.checkbox, { borderColor: on ? primary : palette.border, backgroundColor: on ? primary : 'transparent' }]}
+                        >
+                          {on ? <Ionicons name="checkmark" size={15} color={primaryText} /> : null}
+                        </Pressable>
+                      }
+                    />
+                  </View>
                 );
               })}
+              <Text style={{ color: palette.textFaint, fontSize: 12, lineHeight: 18, marginTop: 2 }}>
+                点标题展开或收起协议全文，点击右侧方框勾选表示已阅读并同意。
+              </Text>
             </View>
           </>
         ) : null}

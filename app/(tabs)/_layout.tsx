@@ -33,6 +33,16 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="more"
+        options={{
+          title: '更多',
+          tabBarLabel: '更多',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'apps' : 'apps-outline'} size={20} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
           title: '设置',

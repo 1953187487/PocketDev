@@ -22,22 +22,41 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   if (!res.ok) return null;
 
   const html = await res.text();
-  const tagMatch = html.match(/\/releases\/tag\/([^"'\s<>]+)/);
+  const tagMatch = html.match(/\/releases\/tag\/(v?[0-9][^"'\s<>]+)/);
   if (!tagMatch) return null;
   const tag = tagMatch[1];
   const nameMatch = html.match(/<title>([^<]+)<\/title>/);
   const name = nameMatch ? nameMatch[1].trim() : tag;
   const dateMatch = html.match(/datetime="([^"]+)"/);
   const publishedAt = dateMatch ? dateMatch[1] : '';
-  const assetMatch = html.match(/\/releases\/download\/[^"'\s<>]+?\.apk/);
+  const assetMatch = html.match(/\/releases\/download\/(v?[0-9][^"'\s<>]+?\.apk)/);
+  const notes = extractReleaseNotes(html);
   return {
     tag,
     name,
     published_at: publishedAt,
     url: `https://github.com/${APP_REPO}/releases/tag/${tag}`,
-    notes: '',
+    notes,
     download_url: assetMatch ? `https://github.com${assetMatch[0]}` : buildDownloadUrl(tag),
   };
+}
+
+/** 从 releases 页 HTML 中提取更新公告正文（markdown-body 区块）。 */
+function extractReleaseNotes(html: string): string {
+  const block = html.match(/<div[^>]*class="markdown-body[^"]*"[^>]*>([\s\S]*?)<\/div>/);
+  if (!block) return '';
+  const text = block[1]
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|li|h[1-6]|tr)>/gi, '\n')
+    .replace(/<li>/gi, '- ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, "'")
+    .replace(/ /g, ' ');
+  return text.split('\n').map((l) => l.trim()).filter(Boolean).join('\n').trim();
 }
 
 export function isNewerVersion(latest: string, current = APP_VERSION): boolean {

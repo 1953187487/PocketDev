@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { Button, Divider, EmptyState, Field, Pill, Row, SubScreen } from '@/components/ui';
+import { ProgressBar } from '@/ui';
 import { downloadModelFile, importModelFile, removeModelFile, formatBytes } from '@/api/models';
 import { useAppStore, type LocalModel } from '@/store/app';
 import { useI18n } from '@/i18n';
@@ -149,8 +150,22 @@ export default function ModelsScreen() {
           ))}
         </View>
 
-        <Field label="下载地址" value={url} onChangeText={setUrl} placeholder="https://…/model.gguf" keyboardType="url" />
+        <Field
+          label="下载地址"
+          value={url}
+          onChangeText={setUrl}
+          placeholder="https://…/model.gguf"
+          keyboardType="url"
+          hint="需 http/https 直链；HuggingFace 请把链接里的 /blob/ 换成 /resolve/，页面地址不能直接下载。"
+        />
         <Field label="保存名称（可选）" value={name} onChangeText={setName} placeholder="model.gguf" />
+
+        {downloading ? (
+          <View style={{ gap: 6, marginBottom: 10 }}>
+            <ProgressBar percent={percent} height={6} />
+            <Text style={{ color: palette.textDim, fontSize: 12 }}>正在下载 {percent}%</Text>
+          </View>
+        ) : null}
 
         <Row style={{ gap: 8, marginTop: 4 }}>
           <View style={{ flex: 1 }}>

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Modal, Linking } from 'react-native';
+import { View, Text, StyleSheet, Modal, Linking, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import NetInfo from '@react-native-community/netinfo';
-import { alpha, radius, useTheme } from '@/theme';
+import { alpha, useTheme } from '@/theme';
 import { Button } from '@/components/ui';
+import { ProgressBar, UpdateTransition, GlassPane } from '@/ui';
 import { downloadApk, installApk, type ReleaseInfo } from '@/api/updates';
 import { APP_REPO_URL } from '@/config';
 
@@ -76,7 +77,8 @@ export function ForceUpdateModal({
       <View style={styles.backdrop}>
         <BlurView intensity={40} tint={palette.mode === 'dark' ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
         <View style={[StyleSheet.absoluteFill, { backgroundColor: palette.overlay }]} />
-        <View style={[styles.panel, { borderColor: palette.border, backgroundColor: palette.mode === 'dark' ? '#121828' : '#FFFFFF' }]}>
+        <UpdateTransition visible={downloading} progress={percent} />
+        <GlassPane intensity={24} style={styles.panel}>
           <View style={styles.panelBody}>
             <View style={[styles.iconWrap, { backgroundColor: alpha(primary, 0.12), borderColor: alpha(primary, 0.3) }]}>
               <Ionicons
@@ -90,10 +92,16 @@ export function ForceUpdateModal({
             </Text>
             <Text style={[styles.tag, { color: primary }]}>{release.tag}</Text>
 
+            {release.notes ? (
+              <Text style={[styles.notes, { color: palette.textDim }]} numberOfLines={5}>
+                {release.notes}
+              </Text>
+            ) : null}
+
             {downloading ? (
               <>
-                <View style={[styles.progressTrack, { backgroundColor: palette.surfaceSunken }]}>
-                  <View style={[styles.progressFill, { width: `${percent}%`, backgroundColor: primary }]} />
+                <View style={styles.progressWrap}>
+                  <ProgressBar percent={percent} height={8} />
                 </View>
                 <Text style={[styles.desc, { color: palette.textDim }]}>已下载 {percent}%</Text>
                 <Button title="取消" variant="ghost" onPress={() => setPhase('idle')} />
@@ -134,26 +142,15 @@ export function ForceUpdateModal({
               </>
             )}
           </View>
-        </View>
+        </GlassPane>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  panel: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: radius.xxl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 12,
-  },
+  backdrop: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, overflow: 'hidden' },
+  panel: { width: '100%', maxWidth: 360 },
   panelBody: { padding: 24, alignItems: 'center' },
   iconWrap: {
     width: 72,
@@ -166,7 +163,7 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 22, fontWeight: '800' },
   tag: { fontSize: 14, fontWeight: '700', marginTop: 4 },
+  notes: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 12 },
   desc: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 10, marginBottom: 22 },
-  progressTrack: { width: '100%', height: 8, borderRadius: 4, marginTop: 18, overflow: 'hidden' },
-  progressFill: { height: '100%', borderRadius: 4 },
+  progressWrap: { width: '100%', marginTop: 18, marginBottom: 10 },
 });

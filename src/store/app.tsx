@@ -14,6 +14,10 @@ export interface ProviderConfig {
 export interface Workspace {
   id: string;
   name: string;
+  /** 工作区来源：远端仓库或手机本地目录。 */
+  kind?: 'git' | 'local';
+  /** 本地目录工作区的 URI 路径。 */
+  root?: string;
   repoFullName?: string;
   repoUrl?: string;
   branch?: string;
@@ -63,6 +67,8 @@ export interface AppPrefs {
   autoUpdate: boolean;
   voiceEnabled: boolean;
   translateEnabled: boolean;
+  /** 计划模式：对话前先出执行计划，经确认后执行。 */
+  planMode: boolean;
 }
 
 export const DEFAULT_PREFS: AppPrefs = {
@@ -73,6 +79,7 @@ export const DEFAULT_PREFS: AppPrefs = {
   autoUpdate: true,
   voiceEnabled: true,
   translateEnabled: true,
+  planMode: false,
 };
 
 const PROVIDER_KEY = 'cfg_provider';
