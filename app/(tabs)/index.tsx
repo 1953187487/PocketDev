@@ -20,6 +20,8 @@ import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai'
 import { speak } from '@/api/speech';
 import { inspectDir, listDir, writeTextFile } from '@/api/localfs';
 import { FileManager } from '@/components/FileManager';
+import { HistorySheet } from '@/components/HistorySheet';
+import { saveSession, getSession, type Session } from '@/api/sessions';
 
 type Bubble = ChatBubbleData;
 
@@ -50,6 +52,8 @@ export default function ChatScreen() {  const { theme } = useTheme();
   const [planAwaiting, setPlanAwaiting] = useState<string | null>(null);
   const [nearBottom, setNearBottom] = useState(true);
   const [fileOpen, setFileOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const listRef = useRef<FlatList<Bubble>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -253,7 +257,52 @@ export default function ChatScreen() {  const { theme } = useTheme();
     setSending(false);
     setPending(null);
     setPlanAwaiting(null);
+    setSessionId(null);
   }, []);
+
+  // 会话持久化：消息变化时自动保存（去抖）。
+  useEffect(() => {
+    if (messages.length === 0) return;
+    const timer = setTimeout(() => {
+      const firstUser = messages.find((m) => m.role === 'user');
+      void saveSession({
+        id: sessionId ?? `s-${Date.now()}`,
+        title: firstUser?.text ?? '新会话',
+        workspaceId: activeWs?.id,
+        workspaceName: activeWs?.name,
+        messages: messages.map((m) => ({ id: m.id, role: m.role, text: m.text, error: m.error, plan: m.plan, createdAt: Date.now() })),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      }).then((saved) => {
+        if (sessionId !== saved.id) setSessionId(saved.id);
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [messages, sessionId, activeWs]);
+
+  const openSession = useCallback(
+    async (s: Session) => {
+      const full = await getSession(s.id);
+      if (full) {
+        setMessages(
+          full.messages
+            .filter((m): m is typeof m & { role: 'user' | 'assistant' } => m.role === 'user' || m.role === 'assistant')
+            .map((m) => ({ id: m.id, role: m.role, text: m.text, error: m.error, plan: m.plan })),
+        );
+        setSessionId(full.id);
+      }
+      setHistoryOpen(false);
+      setSending(false);
+      setPending(null);
+      setPlanAwaiting(null);
+    },
+    [],
+  );
+
+  const newSession = useCallback(() => {
+    clearChat();
+    setHistoryOpen(false);
+  }, [clearChat]);
 
   const doTranslate = useCallback(
     async (text: string, lang: string) => {
@@ -310,7 +359,11 @@ export default function ChatScreen() {  const { theme } = useTheme();
           <Pressable onPress={clearChat} hitSlop={8} style={[styles.iconWrap, { borderColor: palette.border }]}>
             <Ionicons name="trash-outline" size={16} color={palette.textFaint} />
           </Pressable>
-        ) : null}
+        ) : (
+          <Pressable onPress={() => setHistoryOpen(true)} hitSlop={8} style={[styles.iconWrap, { borderColor: palette.border }]}>
+            <Ionicons name="time-outline" size={16} color={palette.textFaint} />
+          </Pressable>
+        )}
       </View>
       <View style={styles.headerActions}>
         <Pressable
@@ -449,6 +502,14 @@ export default function ChatScreen() {  const { theme } = useTheme();
           root={activeWs.root}
         />
       ) : null}
+
+      <HistorySheet
+        visible={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        currentId={sessionId}
+        onOpen={openSession}
+        onNew={newSession}
+      />
 
       {translateMsg ? (
         <TranslateSheet
