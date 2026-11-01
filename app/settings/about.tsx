@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { DonationSection } from '@/components/DonationSection';
+import { REFERENCES } from '@/agreements';
 import { CONTRIBUTORS, DEVELOPERS, APP_VERSION, APP_REPO_URL, MAIN_DEVELOPER } from '@/config';
 
 export default function AboutScreen() {
@@ -62,6 +63,25 @@ export default function AboutScreen() {
                 <Ionicons name="open-outline" size={14} color={palette.textFaint} />
               </Row>
               {i < CONTRIBUTORS.length - 1 ? <Divider style={{ marginTop: 9 }} /> : null}
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 20, marginBottom: 10 }}>引用来源</Text>
+        <View style={[styles.card, { borderColor: palette.border, backgroundColor: palette.surface }]}>
+          {REFERENCES.map((r, i) => (
+            <Pressable key={r.name} onPress={() => Linking.openURL(r.url)} style={{ paddingVertical: 9 }}>
+              <Row style={{ justifyContent: 'space-between', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Row style={{ gap: 6 }}>
+                    <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '700' }}>{r.name}</Text>
+                    <Pill text={r.license} color={palette.textDim} />
+                  </Row>
+                  <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 17 }}>{r.note}</Text>
+                </View>
+                <Ionicons name="open-outline" size={14} color={palette.textFaint} />
+              </Row>
+              {i < REFERENCES.length - 1 ? <Divider style={{ marginTop: 9 }} /> : null}
             </Pressable>
           ))}
         </View>

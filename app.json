@@ -2,7 +2,7 @@
   "expo": {
     "name": "PocketDev",
     "slug": "pocketdev",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "scheme": "pocketdev",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,7 @@
     "backgroundColor": "#080B16",
     "android": {
       "package": "com.pocketdev.app",
-      "versionCode": 5,
+      "versionCode": 6,
       "minSdkVersion": 26,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,

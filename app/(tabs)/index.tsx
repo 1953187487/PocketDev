@@ -34,6 +34,10 @@ interface Bubble {
   plan?: boolean;
   /** Applet 调用结果展示。 */
   tool?: boolean;
+  /** 工具调用名称（卡片标题）。 */
+  toolName?: string;
+  /** 工具执行状态：running 调用中 / done 完成 / error 失败。 */
+  toolStatus?: 'running' | 'done' | 'error';
 }
 
 const SUGGESTIONS = [
@@ -229,16 +233,16 @@ export default function ChatScreen() {
           const applet = applets.find((a) => a.name === call.name);
           const tid = `t-${Date.now()}`;
           if (!applet) {
-            append({ id: tid, role: 'assistant', text: `未找到功能应用「${call.name}」，请检查名称。`, error: true, tool: true });
+            append({ id: tid, role: 'assistant', text: `未找到功能应用「${call.name}」，请检查名称。`, error: true, tool: true, toolName: call.name, toolStatus: 'error' });
           } else {
-            append({ id: tid, role: 'assistant', text: `调用功能应用「${applet.name}」…`, tool: true, streaming: true });
+            append({ id: tid, role: 'assistant', text: `调用功能应用「${applet.name}」…`, tool: true, toolName: applet.name, toolStatus: 'running', streaming: true });
             const r = await runApplet(applet, provider, buildArgs(applet.params, call.args));
             const out = r.ok
               ? typeof r.value === 'string'
                 ? r.value
                 : JSON.stringify(r.value, null, 2)
               : `失败：${r.error}`;
-            patch(tid, (b) => ({ ...b, text: `功能应用「${applet.name}」结果：\n${out}`, streaming: false }));
+            patch(tid, (b) => ({ ...b, text: `功能应用「${applet.name}」结果：\n${out}`, streaming: false, toolStatus: r.ok ? 'done' : 'error' }));
             setSending(false);
             abortRef.current = null;
             await runTurn(
@@ -246,7 +250,7 @@ export default function ChatScreen() {
               [
                 ...historySrc,
                 { id: aid, role: 'assistant', text: full },
-                { id: tid, role: 'assistant', text: `功能应用结果：${out}`, tool: true },
+                { id: tid, role: 'assistant', text: `功能应用结果：${out}`, tool: true, toolName: applet.name, toolStatus: r.ok ? 'done' : 'error' },
               ],
             );
             return;
@@ -426,8 +430,21 @@ export default function ChatScreen() {
 
   const renderEmpty = () => (
     <View style={styles.emptyWrap}>
-      <View style={[styles.emptyLogo, { backgroundColor: alpha(primary, 0.12), borderColor: alpha(primary, 0.3) }]}>
-        <Ionicons name="sparkles" size={30} color={primary} />
+      <View
+        style={[
+          styles.emptyLogo,
+          {
+            backgroundColor: alpha(primary, 0.14),
+            borderColor: alpha(primary, 0.34),
+            shadowColor: primary,
+            shadowOpacity: 0.28,
+            shadowRadius: 22,
+            shadowOffset: { width: 0, height: 8 },
+            elevation: 6,
+          },
+        ]}
+      >
+        <Ionicons name="sparkles" size={32} color={primary} />
       </View>
       <Text style={[styles.emptyTitle, { color: palette.text }]}>有什么可以帮你？</Text>
       <Text style={[styles.emptySub, { color: palette.textDim }]}>
@@ -447,6 +464,7 @@ export default function ChatScreen() {
               <Ionicons name={s.icon} size={16} color={primary} />
             </View>
             <Text style={{ color: palette.text, fontSize: 13, fontWeight: '600' }}>{s.title}</Text>
+            <Ionicons name="arrow-up-outline" size={13} color={palette.textFaint} />
           </Pressable>
         ))}
       </View>
@@ -457,7 +475,22 @@ export default function ChatScreen() {
     if (item.role === 'user') {
       return (
         <View style={[styles.row, styles.rowUser]}>
-          <View style={[styles.bubble, styles.bubbleUser, { backgroundColor: alpha(primary, palette.mode === 'dark' ? 0.24 : 0.9) }]}>
+          <View
+            style={[
+              styles.bubble,
+              styles.bubbleUser,
+              {
+                backgroundColor: alpha(primary, palette.mode === 'dark' ? 0.28 : 0.92),
+                borderColor: alpha(primary, palette.mode === 'dark' ? 0.4 : 0.24),
+                borderWidth: 1,
+                shadowColor: primary,
+                shadowOpacity: palette.mode === 'dark' ? 0.22 : 0.14,
+                shadowRadius: 12,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: 3,
+              },
+            ]}
+          >
             <Text style={{ color: palette.mode === 'dark' ? '#F2F6FF' : '#0E1526', fontSize: 15, lineHeight: 21 }}>{item.text}</Text>
           </View>
           {item.text && !item.streaming && prefs.translateEnabled ? (
@@ -477,17 +510,47 @@ export default function ChatScreen() {
     }
     return (
       <View style={[styles.row, styles.rowAi]}>
-        <View style={[styles.aiAvatar, { backgroundColor: primary }]}>
+        <View
+          style={[
+            styles.aiAvatar,
+            {
+              backgroundColor: primary,
+              shadowColor: primary,
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 3 },
+              elevation: 4,
+            },
+          ]}
+        >
           <Ionicons name="sparkles" size={13} color={primaryText} />
         </View>
-        <View>
-          <View style={[styles.bubble, styles.bubbleAi, { borderColor: palette.border, backgroundColor: palette.surface }]}>
-            {item.text ? (
-              <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 21 }}>{item.text}</Text>
-            ) : (
-              <TypingDots color={primary} />
-            )}
-          </View>
+        <View style={{ flex: 1 }}>
+          {item.tool ? (
+            <ToolCallCard item={item} palette={palette} primary={primary} primaryText={primaryText} />
+          ) : (
+            <View
+              style={[
+                styles.bubble,
+                styles.bubbleAi,
+                {
+                  borderColor: alpha(primary, palette.mode === 'dark' ? 0.16 : 0.12),
+                  backgroundColor: palette.surface,
+                  shadowColor: palette.shadow,
+                  shadowOpacity: 0.1,
+                  shadowRadius: 14,
+                  shadowOffset: { width: 0, height: 6 },
+                  elevation: 2,
+                },
+              ]}
+            >
+              {item.text ? (
+                <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 22 }}>{item.text}</Text>
+              ) : (
+                <TypingDots color={primary} />
+              )}
+            </View>
+          )}
           {item.text && !item.streaming && prefs.translateEnabled ? (
             <View style={styles.msgActions}>
               <Pressable hitSlop={8} onPress={() => doTranslate(item.text, prefs.language === 'en' ? 'zh' : 'en')} style={styles.msgAction}>
@@ -669,7 +732,53 @@ function TranslateSheet({
   );
 }
 
-function TypingDots({ color }: { color: string }) {
+function ToolCallCard({
+  item,
+  palette,
+  primary,
+  primaryText,
+}: {
+  item: Bubble;
+  palette: ReturnType<typeof useTheme>['theme']['palette'];
+  primary: string;
+  primaryText: string;
+}) {
+  const status = item.toolStatus ?? 'done';
+  const color = status === 'error' ? palette.danger : status === 'running' ? primary : palette.success;
+  const label = status === 'error' ? '调用失败' : status === 'running' ? '调用中…' : '调用完成';
+  const icon = status === 'error' ? 'close-circle' : status === 'running' ? 'ellipsis-horizontal' : 'checkmark-circle';
+  const output = item.text.replace(/^(功能应用「.*?」结果：\n|功能应用结果：)/, '').trim();
+  return (
+    <View style={[styles.toolCard, { borderColor: alpha(color, 0.35), backgroundColor: alpha(color, 0.07) }]}>
+      <View style={styles.toolHead}>
+        <View style={[styles.toolIcon, { backgroundColor: alpha(color, 0.16) }]}>
+          <Ionicons name="construct" size={15} color={color} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '700' }} numberOfLines={1}>
+            {item.toolName ?? '功能应用'}
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
+            <Ionicons name={icon} size={12} color={color} />
+            <Text style={{ color, fontSize: 11.5, fontWeight: '600' }}>{label}</Text>
+          </View>
+        </View>
+        {status === 'running' ? <TypingDots color={color} small /> : null}
+      </View>
+      {output ? (
+        <Text
+          style={[styles.toolOutput, { color: status === 'error' ? palette.danger : palette.textDim, backgroundColor: palette.surfaceSunken }]}
+          numberOfLines={6}
+          selectable
+        >
+          {output}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function TypingDots({ color, small }: { color: string; small?: boolean }) {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0.2)).current, useRef(new Animated.Value(0.4)).current];
   useEffect(() => {
     const anim = Animated.loop(
@@ -684,7 +793,7 @@ function TypingDots({ color }: { color: string }) {
   return (
     <View style={styles.dots}>
       {dots.map((d, i) => (
-        <Animated.View key={i} style={[styles.dot, { backgroundColor: color, opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }), transform: [{ translateY: d.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }] }]} />
+        <Animated.View key={i} style={[styles.dot, { backgroundColor: color, width: small ? 5 : 7, height: small ? 5 : 7, opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }), transform: [{ translateY: d.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }] }]} />
       ))}
     </View>
   );
@@ -805,9 +914,21 @@ const styles = StyleSheet.create({
   rowUser: { justifyContent: 'flex-end' },
   rowAi: { justifyContent: 'flex-start', gap: 8 },
   aiAvatar: { width: 30, height: 30, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  bubble: { maxWidth: '82%', paddingHorizontal: 14, paddingVertical: 11, borderRadius: radius.lg },
-  bubbleUser: { borderBottomRightRadius: 6 },
-  bubbleAi: { borderBottomLeftRadius: 6, borderWidth: 1 },
+  bubble: { maxWidth: '82%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: radius.xl },
+  bubbleUser: { borderBottomRightRadius: 8 },
+  bubbleAi: { borderBottomLeftRadius: 8 },
+  toolCard: { borderWidth: 1, borderRadius: radius.lg, padding: 12, marginBottom: 2 },
+  toolHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  toolIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  toolOutput: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: radius.md,
+    fontFamily: 'monospace',
+    overflow: 'hidden',
+  },
   msgActions: { flexDirection: 'row', gap: 12, marginTop: 6, paddingHorizontal: 2 },
   planConfirm: {
     flexDirection: 'row',

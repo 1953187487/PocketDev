@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { AGREEMENTS } from '@/agreements';
+import { AGREEMENTS, REFERENCES } from '@/agreements';
 import { useAppStore } from '@/store/app';
 import { APP_REPO_URL, DEVELOPERS, CONTRIBUTORS } from '@/config';
 
@@ -63,6 +63,25 @@ export default function AgreementsScreen() {
             </View>
           );
         })}
+
+        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 22, marginBottom: 10 }}>引用来源</Text>
+        {REFERENCES.map((r) => (
+          <Row key={r.name} style={{ gap: 12, paddingVertical: 9, alignItems: 'flex-start' }}>
+            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.08) }]}>
+              <Ionicons name="logo-github" size={16} color={palette.textDim} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '700' }}>{r.name}</Text>
+                <Pill text={r.license} color={palette.textDim} />
+              </View>
+              <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 17 }}>{r.note}</Text>
+            </View>
+            <Pressable hitSlop={8} onPress={() => Linking.openURL(r.url)}>
+              <Ionicons name="open-outline" size={15} color={palette.textDim} />
+            </Pressable>
+          </Row>
+        ))}
 
         <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 22, marginBottom: 10 }}>安全承诺</Text>
         {SECURITY_ITEMS.map((s) => (

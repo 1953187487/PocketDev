@@ -1,4 +1,11 @@
 import type { ProviderConfig } from '@/store/app';
+import {
+  buildEndpoint,
+  buildModelsEndpoint,
+  extractDelta,
+  isLocalBaseUrl,
+  sseFetch,
+} from './stream';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -15,13 +22,6 @@ export class ChatError extends Error {
 function joinUrl(baseUrl: string, path: string): string {
   const base = baseUrl.trim().replace(/\/+$/, '');
   return `${base}${path}`;
-}
-
-function endpoints(cfg: ProviderConfig) {
-  if (cfg.interfaceType === 'anthropic') {
-    return joinUrl(cfg.baseUrl, '/v1/messages');
-  }
-  return joinUrl(cfg.baseUrl, '/chat/completions');
 }
 
 function headers(cfg: ProviderConfig): Record<string, string> {
@@ -60,26 +60,7 @@ function buildBody(cfg: ProviderConfig, messages: ChatMessage[], stream: boolean
 }
 
 /** 从流式 SSE 行中抽取增量文本，返回 null 表示无内容。 */
-function extractDelta(rawLine: string, anthropic: boolean): { text?: string; done?: boolean } | null {
-  const line = rawLine.trim();
-  if (!line.startsWith('data:')) return null;
-  const payload = line.slice(5).trim();
-  if (!payload || payload === '[DONE]') return { done: true };
-  try {
-    const json = JSON.parse(payload);
-    if (anthropic) {
-      if (json.type === 'content_block_delta' && json.delta?.text) return { text: json.delta.text };
-      if (json.type === 'message_stop') return { done: true };
-      return null;
-    }
-    const delta = json.choices?.[0]?.delta;
-    if (typeof delta?.content === 'string' && delta.content) return { text: delta.content };
-    if (typeof json.choices?.[0]?.text === 'string' && json.choices[0].text) return { text: json.choices[0].text };
-    return null;
-  } catch {
-    return null;
-  }
-}
+export { extractDelta };
 
 export interface StreamHandlers {
   onDelta: (text: string) => void;
@@ -96,75 +77,66 @@ export async function streamChat(
   if (!cfg.model.trim()) throw new ChatError('尚未配置模型名称，请前往设置填写');
 
   const anthropic = cfg.interfaceType === 'anthropic';
-  const res = await fetch(endpoints(cfg), {
-    method: 'POST',
-    headers: headers(cfg),
-    body: JSON.stringify(buildBody(cfg, messages, true)),
-    signal: handlers.signal,
+  const url = buildEndpoint(cfg.baseUrl, cfg.interfaceType);
+
+  // React Native 的 fetch 不暴露 ReadableStream，这里统一走 XHR 增量读取。
+  return new Promise<string>((resolve, reject) => {
+    let settled = false;
+    const finish = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+    const controller = sseFetch(
+      url,
+      { headers: headers(cfg), body: JSON.stringify(buildBody(cfg, messages, true)) },
+      anthropic,
+      {
+        onDelta: handlers.onDelta,
+        onDone: (full) => {
+          finish(() => {
+            handlers.onDone?.(full);
+            resolve(full);
+          });
+        },
+        onError: (message, status) => {
+          finish(() => reject(new ChatError(message, status)));
+        },
+        signal: handlers.signal,
+      },
+    );
+    handlers.signal?.addEventListener('abort', () => {
+      finish(() => {
+        controller.abort();
+        reject(new ChatError('已停止', 0));
+      });
+    });
   });
-
-  if (!res.ok) {
-    let detail = '';
-    try {
-      const text = await res.text();
-      try {
-        const j = JSON.parse(text);
-        detail = j.error?.message || j.message || text.slice(0, 200);
-      } catch {
-        detail = text.slice(0, 200);
-      }
-    } catch {
-      /* ignore */
-    }
-    if (res.status === 401 || res.status === 403) throw new ChatError('API Key 无效或无权限，请检查设置', res.status);
-    if (res.status === 404) throw new ChatError('接口地址或模型不存在，请检查 Base URL 与模型名', res.status);
-    throw new ChatError(detail || `请求失败（${res.status}）`, res.status);
-  }
-
-  const reader = res.body?.getReader();
-  if (!reader) {
-    const json = await res.json().catch(() => null);
-    const text = anthropic ? json?.content?.[0]?.text ?? '' : json?.choices?.[0]?.message?.content ?? '';
-    handlers.onDelta(text);
-    handlers.onDone?.(text);
-    return text;
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let full = '';
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
-      const parsed = extractDelta(line, anthropic);
-      if (!parsed) continue;
-      if (parsed.done) {
-        handlers.onDone?.(full);
-        return full;
-      }
-      if (parsed.text) {
-        full += parsed.text;
-        handlers.onDelta(parsed.text);
-      }
-    }
-  }
-  handlers.onDone?.(full);
-  return full;
 }
 
 export async function listRemoteModels(cfg: Pick<ProviderConfig, 'baseUrl' | 'apiKey'>): Promise<string[]> {
   if (!cfg.apiKey.trim()) return [];
-  const url = joinUrl(cfg.baseUrl, '/models');
+  const url = buildModelsEndpoint(cfg.baseUrl);
   const res = await fetch(url, { headers: { Authorization: `Bearer ${cfg.apiKey}` } });
   if (!res.ok) throw new ChatError(`拉取失败（${res.status}）`, res.status);
   const json = await res.json();
   const list = json?.data ?? json?.models ?? [];
   if (!Array.isArray(list)) return [];
   return list.map((m: any) => (typeof m === 'string' ? m : m?.id ?? m?.name)).filter(Boolean);
+}
+
+/** 规范化服务商地址：OpenAI 兼容强制补 /v1；Anthropic 补 /v1 前缀。 */
+export function normalizeBaseUrl(baseUrl: string, interfaceType: ProviderConfig['interfaceType']): string {
+  const raw = baseUrl.trim().replace(/\/+$/, '');
+  if (!raw) return raw;
+  if (interfaceType === 'anthropic') {
+    return raw.endsWith('/v1') ? raw : `${raw}/v1`;
+  }
+  return raw.endsWith('/v1') ? raw : `${raw}/v1`;
+}
+
+export function isLocalEndpoint(baseUrl: string): boolean {
+  return isLocalBaseUrl(baseUrl);
 }
 
 export async function testProvider(cfg: ProviderConfig): Promise<{ ok: boolean; message: string }> {

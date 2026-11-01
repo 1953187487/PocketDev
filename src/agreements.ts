@@ -4,11 +4,51 @@ export interface Agreement {
   body: string;
 }
 
+export interface Reference {
+  name: string;
+  url: string;
+  license: string;
+  note: string;
+}
+
+/** 本项目引用的第三方开源项目与参考实现。 */
+export const REFERENCES: Reference[] = [
+  {
+    name: 'chaitin/MonkeyCode',
+    url: 'https://github.com/chaitin/MonkeyCode',
+    license: 'AGPL-3.0',
+    note: '底层 AI 能力层（智能体、对话编排、代码执行）',
+  },
+  {
+    name: 'ZG0704666/Aries-AI',
+    url: 'https://github.com/ZG0704666/Aries-AI',
+    license: 'Apache-2.0',
+    note: '整体 UI 与美学、消息气泡、首页布局与主题配色参考',
+  },
+  {
+    name: 'wenjinliuu/ios-ci-workflows',
+    url: 'https://github.com/wenjinliuu/ios-ci-workflows',
+    license: 'MIT',
+    note: 'AI + GitHub Actions 自动构建/测试/发布流程架构',
+  },
+  {
+    name: 'React Native / Expo',
+    url: 'https://expo.dev',
+    license: 'MIT',
+    note: '跨端运行时与原生能力封装',
+  },
+];
+
 export const AGREEMENTS: Agreement[] = [
   {
     key: 'oss',
     title: '开源协议（AGPL-3.0）',
     body: `PocketDev 基于 AGPL-3.0 协议开源，底层 AI 能力层由 chaitin/MonkeyCode（长亭科技）提供，同样遵循 AGPL-3.0。
+
+本项目参考并移植了以下开源项目：
+· ZG0704666/Aries-AI（Apache-2.0）：整体 UI 与美学、消息气泡、首页布局与主题配色；
+· wenjinliuu/ios-ci-workflows（MIT）：AI + GitHub Actions 自动构建/测试/发布流程架构；
+· React Native / Expo（MIT）：跨端运行时与原生能力封装。
 
 一、你可以自由地使用、复制、修改、分发本软件及其源码，并用于商业用途，前提是：
 1. 修改后的版本必须以相同协议（AGPL-3.0）开源；

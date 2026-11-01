@@ -20,12 +20,19 @@ export interface AccentColor {
   soft: string;
 }
 
+/**
+ * 强调色板，移植自 Aries-AI（https://github.com/ZG0704666/Aries-AI）
+ * core/designsystem/theme/ThemeAccent.kt 的 M3 色板（MIT）。
+ */
 export const ACCENTS: AccentColor[] = [
   { id: 'azure', name: '苍穹蓝', primary: '#5B7FFF', primaryText: '#FFFFFF', soft: 'rgba(91,127,255,0.16)' },
+  { id: 'ocean', name: '海洋', primary: '#006495', primaryText: '#FFFFFF', soft: 'rgba(0,100,149,0.16)' },
+  { id: 'forest', name: '森林', primary: '#2F6B3F', primaryText: '#FFFFFF', soft: 'rgba(47,107,63,0.16)' },
+  { id: 'sunset', name: '日落', primary: '#9A4A17', primaryText: '#FFFFFF', soft: 'rgba(154,74,23,0.16)' },
+  { id: 'rose', name: '樱粉', primary: '#9C415D', primaryText: '#FFFFFF', soft: 'rgba(156,65,93,0.16)' },
   { id: 'violet', name: '星云紫', primary: '#A78BFA', primaryText: '#0B1020', soft: 'rgba(167,139,250,0.16)' },
   { id: 'cyan', name: '青璃', primary: '#22D3EE', primaryText: '#05202A', soft: 'rgba(34,211,238,0.16)' },
   { id: 'mint', name: '薄荷', primary: '#34D399', primaryText: '#04291C', soft: 'rgba(52,211,153,0.16)' },
-  { id: 'rose', name: '樱粉', primary: '#F472B6', primaryText: '#3B0A24', soft: 'rgba(244,114,182,0.16)' },
   { id: 'amber', name: '琥珀', primary: '#FBBF24', primaryText: '#3B2A04', soft: 'rgba(251,191,36,0.16)' },
   { id: 'ember', name: '赤焰', primary: '#FB7185', primaryText: '#FFFFFF', soft: 'rgba(251,113,133,0.16)' },
 ];
@@ -138,7 +145,7 @@ const ACCENT_KEY = 'theme_accent';
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const system = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>('system');
-  const [accentId, setAccentIdState] = useState<string>('azure');
+  const [accentId, setAccentIdState] = useState<string>('ocean');
 
   useEffect(() => {
     let alive = true;

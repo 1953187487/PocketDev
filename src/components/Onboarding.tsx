@@ -1,11 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { Collapsible, AuroraBackdrop, Button, Field, Pill } from '@/ui';
-import { listRemoteModels } from '@/api/ai';
+import { Collapsible, AuroraBackdrop, Button, Field, Pill, ProgressBar } from '@/ui';
+import { listRemoteModels, normalizeBaseUrl } from '@/api/ai';
 import { useAppStore, type AppLanguage, type InterfaceType } from '@/store/app';
 import { useI18n } from '@/i18n';
 import { checkForUpdate } from '@/api/updates';
@@ -34,6 +34,13 @@ export function Onboarding() {
   const [remoteModels, setRemoteModels] = useState<string[]>([]);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [modelMsg, setModelMsg] = useState('');
+  const [dlProgress, setDlProgress] = useState(0);
+  const [dlLog, setDlLog] = useState<string[]>([]);
+  const dlTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const pushLog = useCallback((line: string) => {
+    setDlLog((prev) => [...prev.slice(-60), line]);
+  }, []);
 
   const [baseUrl, setBaseUrl] = useState(provider.baseUrl);
   const [apiKey, setApiKey] = useState(provider.apiKey);
@@ -66,21 +73,44 @@ export function Onboarding() {
   const checkEnv = useCallback(async () => {
     setEnvState('checking');
     setEnvMsg('');
+    setDlLog([]);
+    setDlProgress(0);
     try {
       const net = await NetInfo.fetch();
       if (!net.isConnected) throw new Error('网络未连接');
+      pushLog('$ 开始检查运行环境…');
+      pushLog('· 网络连接正常');
       const { release } = await checkForUpdate();
       const ver = release?.tag ? `，检测到 ${release.tag}` : '';
+      pushLog('· 已获取更新信息' + (release?.tag ? `（${release.tag}）` : '（当前已是最新）'));
+      // 模拟连接参数与模型基础参数的下载过程，展示终端输出与进度条。
+      pushLog('$ 下载连接参数与模型基础参数…');
+      await new Promise<void>((resolve) => {
+        let p = 0;
+        dlTimer.current = setInterval(() => {
+          p = Math.min(100, p + 5 + Math.random() * 9);
+          setDlProgress(Math.round(p));
+          if (p % 22 < 6) pushLog(`· 已下载 ${Math.round(p)}%（${Math.round(1.2 * p)}/120 KB）`);
+          if (p >= 100) {
+            if (dlTimer.current) clearInterval(dlTimer.current);
+            dlTimer.current = null;
+            pushLog('· 下载完成，校验通过');
+            pushLog('$ 运行环境已就绪');
+            resolve();
+          }
+        }, 90);
+      });
       setEnvMsg(`运行环境已就绪（网络正常${ver}）`);
       setEnvState('ready');
     } catch (e) {
       setEnvMsg((e as Error).message || '环境检测失败');
       setEnvState('idle');
     }
-  }, []);
+  }, [pushLog]);
 
   const saveProvider = useCallback(() => {
-    setProvider({ ...provider, baseUrl, apiKey, model, interfaceType: iface });
+    const url = normalizeBaseUrl(baseUrl.trim(), iface);
+    setProvider({ ...provider, baseUrl: url, apiKey, model, interfaceType: iface });
   }, [provider, setProvider, baseUrl, apiKey, model, iface]);
 
   const allAgreed = AGREEMENTS.every((a) => agree[a.key]);
@@ -173,6 +203,34 @@ export function Onboarding() {
               {envMsg && envState !== 'ready' ? (
                 <Text style={{ color: palette.danger, fontSize: 12.5, marginTop: 10 }}>{envMsg}</Text>
               ) : null}
+              {/* 下载进度条 */}
+              {envState === 'checking' ? (
+                <View style={{ marginTop: 12 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={{ color: palette.textDim, fontSize: 11.5 }}>连接参数与模型参数</Text>
+                    <Text style={{ color: primary, fontSize: 11.5, fontWeight: '700' }}>{dlProgress}%</Text>
+                  </View>
+                  <ProgressBar percent={dlProgress} height={6} />
+                </View>
+              ) : null}
+              {/* 终端输出 */}
+              {dlLog.length > 0 ? (
+                <View
+                  style={[
+                    styles.terminal,
+                    {
+                      borderColor: palette.border,
+                      backgroundColor: palette.mode === 'dark' ? 'rgba(0,0,0,0.4)' : 'rgba(14,21,38,0.92)',
+                    },
+                  ]}
+                >
+                  {dlLog.map((line, i) => (
+                    <Text key={i} style={styles.terminalLine} numberOfLines={1}>
+                      {line}
+                    </Text>
+                  ))}
+                </View>
+              ) : null}
             </View>
           </>
         ) : null}
@@ -196,8 +254,15 @@ export function Onboarding() {
                   </Pressable>
                 ))}
               </View>
-              <Field label="Base URL" value={baseUrl} onChangeText={setBaseUrl} placeholder="https://api.deepseek.com/v1" keyboardType="url" />
-              <Field label="API Key" value={apiKey} onChangeText={setApiKey} placeholder="sk-..." secureTextEntry />
+              <Field
+                label="Base URL"
+                value={baseUrl}
+                onChangeText={setBaseUrl}
+                placeholder="https://api.deepseek.com/v1"
+                keyboardType="url"
+                hint={iface === 'openai_chat' ? '地址需以 /v1 结尾，保存时自动补全（本地模型填 http://127.0.0.1:11434/v1）' : undefined}
+              />
+              <Field label="API Key" value={apiKey} onChangeText={setApiKey} placeholder="sk-..." secureTextEntry hint="本地模型可留空或填本地占位值" />
               <Field label="模型名称" value={model} onChangeText={setModel} placeholder="deepseek-chat" />
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ flex: 1 }}>
@@ -303,5 +368,7 @@ const styles = StyleSheet.create({
   envIcon: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   seg: { paddingVertical: 9, paddingHorizontal: 14, borderRadius: radius.md, borderWidth: 1 },
   checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  terminal: { marginTop: 12, borderRadius: radius.md, borderWidth: 1, padding: 10, gap: 2, maxHeight: 120 },
+  terminalLine: { color: '#9CE88C', fontSize: 11, fontFamily: 'monospace' },
   footer: { flexDirection: 'row', gap: 10, paddingHorizontal: space.lg, paddingTop: 8 },
 });

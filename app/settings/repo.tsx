@@ -1,15 +1,14 @@
 import { Button, Divider, Field, Pill, Row, SubScreen } from '@/ui';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { verifyToken } from '@/api/git';
 import { GIT_HOSTS } from '@/api/git';
 import { useAppStore, type GitPlatform } from '@/store/app';
+import { safeBack } from '@/navigation';
 
 export default function RepoScreen() {
-  const router = useRouter();
   const { theme } = useTheme();
   const { palette, primary } = theme;
   const { git, setGit } = useAppStore();
@@ -35,13 +34,13 @@ export default function RepoScreen() {
       setUsername(res.username ?? username);
       setGit({ platform, baseUrl, token, username: res.username ?? username, avatar: res.avatar });
       Alert.alert('授权成功', `已一键授权 ${GIT_HOSTS[platform].label}：${res.username ?? username}`);
-      router.back();
+      safeBack('/(tabs)/repo');
     }
     setVerifying(false);
-  }, [platform, baseUrl, token, username, setGit, router]);
+  }, [platform, baseUrl, token, username, setGit]);
 
   return (
-    <SubScreen title="仓库配置" onBack={() => router.back()}>
+    <SubScreen title="仓库配置" onBack={() => safeBack('/(tabs)/repo')}>
       <View style={{ paddingHorizontal: space.lg }}>
         <Text style={{ color: palette.textDim, fontSize: 13, lineHeight: 20, marginBottom: 16 }}>
           选择代码托管平台，粘贴 Personal Access Token 一键授权，即可直连你的仓库。

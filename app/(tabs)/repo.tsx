@@ -113,7 +113,7 @@ export default function RepoScreen() {
                 在「设置 → 访问令牌」中填入 GitHub / GitLab / Gitee 的 Personal Access Token，配置完成后即可在此列出仓库、创建仓库并加入工作区。
               </Text>
               <Spacer h={14} />
-              <Button title="前往配置令牌" icon="settings-outline" onPress={() => router.push('/settings')} />
+              <Button title="前往配置令牌" icon="settings-outline" onPress={() => router.push('/settings/repo')} />
             </Surface>
           </View>
         ) : null}
