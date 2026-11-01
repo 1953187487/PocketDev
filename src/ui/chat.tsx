@@ -282,34 +282,47 @@ export function SuggestionCard({ icon, title, onPress, style }: SuggestionCardPr
   );
 }
 
-/* ---------- 工作区选择器（输入栏上方） ---------- */
+/* ---------- 上下文选择器（输入栏上方：左仓库 + 右工作区 + 添加文件） ---------- */
 export interface WorkspaceSwitcherProps {
-  name: string | null;
-  kind?: 'git' | 'local';
-  onPress: () => void;
+  repoName: string | null;
+  wsName: string | null;
+  onRepoPress: () => void;
+  onWsPress: () => void;
+  onAddFile: () => void;
   onManageFiles?: () => void;
 }
 
-export function WorkspaceSwitcher({ name, kind, onPress, onManageFiles }: WorkspaceSwitcherProps) {
+export function WorkspaceSwitcher({ repoName, wsName, onRepoPress, onWsPress, onAddFile, onManageFiles }: WorkspaceSwitcherProps) {
   const { theme } = useTheme();
   const { palette, primary } = theme;
-  const active = !!name;
   return (
     <View style={styles.switcherRow}>
       <Pressable
-        onPress={onPress}
-        style={[styles.switcherChip, { borderColor: active ? alpha(primary, 0.5) : palette.border, backgroundColor: active ? alpha(primary, 0.08) : 'transparent' }]}
+        onPress={onRepoPress}
+        style={[styles.switcherChip, { borderColor: repoName ? alpha(primary, 0.5) : palette.border, backgroundColor: repoName ? alpha(primary, 0.08) : 'transparent' }]}
       >
-        <Ionicons name={active ? (kind === 'local' ? 'folder' : 'git-branch') : 'folder-open-outline'} size={14} color={active ? primary : palette.textFaint} />
-        <Text style={[styles.switcherText, { color: active ? primary : palette.textFaint }]} numberOfLines={1}>
-          {name ?? '选择工作区'}
+        <Ionicons name={repoName ? 'git-branch' : 'git-branch-outline'} size={14} color={repoName ? primary : palette.textFaint} />
+        <Text style={[styles.switcherText, { color: repoName ? primary : palette.textFaint }]} numberOfLines={1}>
+          {repoName ?? '选择仓库'}
         </Text>
-        <Ionicons name="chevron-down" size={13} color={active ? primary : palette.textFaint} />
+        <Ionicons name="chevron-down" size={13} color={repoName ? primary : palette.textFaint} />
       </Pressable>
-      {active && onManageFiles ? (
+      <Pressable
+        onPress={onWsPress}
+        style={[styles.switcherChip, { borderColor: wsName ? alpha(primary, 0.5) : palette.border, backgroundColor: wsName ? alpha(primary, 0.08) : 'transparent' }]}
+      >
+        <Ionicons name={wsName ? 'folder' : 'folder-open-outline'} size={14} color={wsName ? primary : palette.textFaint} />
+        <Text style={[styles.switcherText, { color: wsName ? primary : palette.textFaint }]} numberOfLines={1}>
+          {wsName ?? '选择工作区'}
+        </Text>
+        <Ionicons name="chevron-down" size={13} color={wsName ? primary : palette.textFaint} />
+      </Pressable>
+      <Pressable onPress={onAddFile} hitSlop={6} style={[styles.switcherFile, { borderColor: palette.border }]}>
+        <Ionicons name="attach" size={15} color={palette.textDim} />
+      </Pressable>
+      {wsName && onManageFiles ? (
         <Pressable onPress={onManageFiles} hitSlop={6} style={[styles.switcherFile, { borderColor: palette.border }]}>
           <Ionicons name="documents-outline" size={15} color={palette.textDim} />
-          <Text style={{ color: palette.textDim, fontSize: 12.5, fontWeight: '600' }}>文件</Text>
         </Pressable>
       ) : null}
     </View>

@@ -89,6 +89,7 @@ const PROVIDER_KEY = 'cfg_provider';
 const GIT_KEY = 'cfg_git';
 const WORKSPACES_KEY = 'workspaces';
 const ACTIVE_WS_KEY = 'active_workspace';
+const ACTIVE_REPO_KEY = 'active_repo';
 const PREFS_KEY = 'app_prefs';
 const MODELS_KEY = 'local_models';
 
@@ -104,6 +105,8 @@ interface AppStore {
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
   setActiveWorkspaceId: (id: string | null) => void;
+  activeRepoId: string | null;
+  setActiveRepoId: (id: string | null) => void;
   addWorkspace: (w: Omit<Workspace, 'id'>) => Workspace;
   updateWorkspace: (id: string, patch: Partial<Workspace>) => void;
   removeWorkspace: (id: string) => void;
@@ -129,6 +132,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
   const [git, setGitState] = useState<GitConfig>(DEFAULT_GIT);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveId] = useState<string | null>(null);
+  const [activeRepoId, setActiveRepoIdState] = useState<string | null>(null);
   const [providerReady, setProviderReady] = useState(false);
   const [gitReady, setGitReady] = useState(false);
   const [tabBarVisible, setTabBarVisible] = useState(true);
@@ -138,11 +142,12 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const [p, g, ws, active, pre, mods] = await Promise.all([
+      const [p, g, ws, active, activeRepo, pre, mods] = await Promise.all([
         getObject<Partial<ProviderConfig>>(PROVIDER_KEY),
         getObject<Partial<GitConfig>>(GIT_KEY),
         getObject<Workspace[]>(WORKSPACES_KEY),
         getObject<string>(ACTIVE_WS_KEY),
+        getObject<string>(ACTIVE_REPO_KEY),
         getObject<Partial<AppPrefs>>(PREFS_KEY),
         getObject<LocalModel[]>(MODELS_KEY),
       ]);
@@ -150,6 +155,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       if (g) setGitState({ ...DEFAULT_GIT, ...g });
       if (Array.isArray(ws)) setWorkspaces(ws);
       if (typeof active === 'string') setActiveId(active);
+      if (typeof activeRepo === 'string') setActiveRepoIdState(activeRepo);
       if (pre) setPrefsState({ ...DEFAULT_PREFS, ...pre });
       if (Array.isArray(mods)) setLocalModels(mods);
       setProviderReady(true);
@@ -178,15 +184,24 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     void setObject(ACTIVE_WS_KEY, id);
   }, []);
 
+  const setActiveRepoId = useCallback((id: string | null) => {
+    setActiveRepoIdState(id);
+    void setObject(ACTIVE_REPO_KEY, id);
+  }, []);
+
   const addWorkspace = useCallback(
     (w: Omit<Workspace, 'id'>) => {
       const created: Workspace = { id: uid(), ...w };
       persistWorkspaces([created, ...workspaces]);
-      setActiveId(created.id);
-      void setObject(ACTIVE_WS_KEY, created.id);
+      // 仓库（无 root）与本地工作区（有 root）独立激活
+      if (w.kind === 'local' && w.root) {
+        setActiveWorkspaceId(created.id);
+      } else {
+        setActiveRepoId(created.id);
+      }
       return created;
     },
-    [workspaces, persistWorkspaces],
+    [workspaces, persistWorkspaces, setActiveWorkspaceId, setActiveRepoId],
   );
 
   const updateWorkspace = useCallback(
@@ -201,12 +216,15 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       const next = workspaces.filter((w) => w.id !== id);
       persistWorkspaces(next);
       if (activeWorkspaceId === id) {
-        const fallback = next[0]?.id ?? null;
-        setActiveId(fallback);
-        void setObject(ACTIVE_WS_KEY, fallback);
+        const fallback = next.find((w) => w.kind === 'local' && w.root)?.id ?? null;
+        setActiveWorkspaceId(fallback);
+      }
+      if (activeRepoId === id) {
+        const fallback = next.find((w) => w.kind !== 'local')?.id ?? null;
+        setActiveRepoId(fallback);
       }
     },
-    [workspaces, activeWorkspaceId, persistWorkspaces],
+    [workspaces, activeWorkspaceId, activeRepoId, persistWorkspaces, setActiveWorkspaceId, setActiveRepoId],
   );
 
   const setPrefs = useCallback((patch: Partial<AppPrefs>) => {
@@ -249,6 +267,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       workspaces,
       activeWorkspaceId,
       setActiveWorkspaceId,
+      activeRepoId,
+      setActiveRepoId,
       addWorkspace,
       updateWorkspace,
       removeWorkspace,
@@ -270,6 +290,8 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
       workspaces,
       activeWorkspaceId,
       setActiveWorkspaceId,
+      activeRepoId,
+      setActiveRepoId,
       addWorkspace,
       updateWorkspace,
       removeWorkspace,
@@ -294,5 +316,22 @@ export function useAppStore(): AppStore {
 
 export function useActiveWorkspace(): Workspace | null {
   const { workspaces, activeWorkspaceId } = useAppStore();
-  return workspaces.find((w) => w.id === activeWorkspaceId) ?? null;
+  return workspaces.find((w) => w.id === activeWorkspaceId && w.kind === 'local' && w.root) ?? null;
+}
+
+export function useActiveRepo(): Workspace | null {
+  const { workspaces, activeRepoId } = useAppStore();
+  return workspaces.find((w) => w.id === activeRepoId && w.kind !== 'local') ?? null;
+}
+
+/** 已加入的仓库列表（非本地工作区）。 */
+export function useRepos(): Workspace[] {
+  const { workspaces } = useAppStore();
+  return workspaces.filter((w) => w.kind !== 'local');
+}
+
+/** 本地工作区列表（有 root 的目录）。 */
+export function useLocalWorkspaces(): Workspace[] {
+  const { workspaces } = useAppStore();
+  return workspaces.filter((w) => w.kind === 'local' && !!w.root);
 }

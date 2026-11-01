@@ -15,15 +15,19 @@ export interface DirectoryPickerProps {
   visible: boolean;
   onClose: () => void;
   onPick: (path: string) => void;
+  /** dir=选择目录（默认）；file=可选择文件作为附件。 */
+  mode?: 'dir' | 'file';
+  /** 起始浏览目录，默认为应用私有目录。 */
+  startPath?: string;
 }
 
-/** 目录选择器：浏览手机目录（私有目录 + SAF 授权的任意系统目录），选择后作为工作区。 */
-export function DirectoryPicker({ visible, onClose, onPick }: DirectoryPickerProps) {
+/** 目录/文件选择器：浏览手机目录（私有目录 + SAF 授权的任意系统目录）。 */
+export function DirectoryPicker({ visible, onClose, onPick, mode = 'dir', startPath }: DirectoryPickerProps) {
   const { theme } = useTheme();
   const { palette, primary } = theme;
   const insets = useSafeAreaInsets();
 
-  const [cwd, setCwd] = useState(FileSystem.documentDirectory || '/');
+  const [cwd, setCwd] = useState(startPath || FileSystem.documentDirectory || '/');
   const [stack, setStack] = useState<string[]>([]);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,13 +48,13 @@ export function DirectoryPicker({ visible, onClose, onPick }: DirectoryPickerPro
 
   useEffect(() => {
     if (visible) {
-      const start = FileSystem.documentDirectory || '/';
+      const start = startPath || FileSystem.documentDirectory || '/';
       setCwd(start);
       setStack([]);
       setMsg('');
       void load(start);
     }
-  }, [visible, load]);
+  }, [visible, startPath, load]);
 
   const enter = useCallback(
     (e: Entry) => {
@@ -147,7 +151,7 @@ export function DirectoryPicker({ visible, onClose, onPick }: DirectoryPickerPro
                   <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
                     {isSafUri(e.name) ? safName(e.name) : e.name}
                   </Text>
-                  {e.isDir ? (
+                  {e.isDir && mode !== 'file' ? (
                     <Pressable
                       hitSlop={8}
                       onPress={() => onPick(resolveEntry(cwd, e.name))}
@@ -156,15 +160,26 @@ export function DirectoryPicker({ visible, onClose, onPick }: DirectoryPickerPro
                       <Text style={{ color: primary, fontSize: 12, fontWeight: '700' }}>选择</Text>
                     </Pressable>
                   ) : null}
+                  {!e.isDir && mode === 'file' ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => onPick(resolveEntry(cwd, e.name))}
+                      style={[styles.pickBtn, { borderColor: alpha(primary, 0.5), backgroundColor: alpha(primary, 0.08) }]}
+                    >
+                      <Text style={{ color: primary, fontSize: 12, fontWeight: '700' }}>引用</Text>
+                    </Pressable>
+                  ) : null}
                 </Pressable>
               ))
             )}
           </ScrollView>
 
-          <Pressable onPress={() => onPick(cwd)} style={[styles.pickBtn, styles.pickBottom, { backgroundColor: primary, borderColor: primary }]}>
-            <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-            <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>将当前目录设为工作区</Text>
-          </Pressable>
+          {mode !== 'file' ? (
+            <Pressable onPress={() => onPick(cwd)} style={[styles.pickBtn, styles.pickBottom, { backgroundColor: primary, borderColor: primary }]}>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>将当前目录设为工作区</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Modal>

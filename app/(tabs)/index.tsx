@@ -1,6 +1,7 @@
 import { AuroraBackdrop, ChatBubble, Composer, SuggestionCard, WorkspaceSwitcher, type ChatBubbleData } from '@/ui';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -13,12 +14,13 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
+import { useAppStore, useActiveWorkspace, useActiveRepo, useRepos, useLocalWorkspaces, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak } from '@/api/speech';
-import { inspectDir, listDir, writeTextFile, isSafUri, safName } from '@/api/localfs';
+import { inspectDir, listDir, writeTextFile, readTextFile, isSafUri, safName } from '@/api/localfs';
 import { FileManager } from '@/components/FileManager';
 import { DirectoryPicker } from '@/components/DirectoryPicker';
 import { HistorySheet } from '@/components/HistorySheet';
@@ -36,15 +38,20 @@ const SUGGESTIONS = [
 export default function ChatScreen() {  const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
-  const { provider, workspaces, setTabBarVisible, prefs, setPrefs, addWorkspace, setActiveWorkspaceId } = useAppStore();
+  const { provider, setTabBarVisible, prefs, setPrefs, addWorkspace, setActiveWorkspaceId, setActiveRepoId } = useAppStore();
   const planMode = prefs.planMode;
   const activeWs = useActiveWorkspace();
+  const activeRepo = useActiveRepo();
+  const repos = useRepos();
+  const localWorkspaces = useLocalWorkspaces();
 
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
+  const [repoOpen, setRepoOpen] = useState(false);
   const [dirOpen, setDirOpen] = useState(false);
+  const [filePick, setFilePick] = useState<{ visible: boolean; root: string | null }>({ visible: false, root: null });
   const [keyboardOn, setKeyboardOn] = useState(false);
   const [scrollToBottom, setScrollToBottom] = useState(0);
   const [translateMsg, setTranslateMsg] = useState<{ text: string; result: string; lang: string } | null>(null);
@@ -82,33 +89,31 @@ export default function ChatScreen() {  const { theme } = useTheme();
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  // 预计算工作区上下文（本地目录列出文件清单，远端仓库携带仓库信息）。
+  // 预计算上下文：仓库（repo）与工作区（本地目录）独立叠加。
   useEffect(() => {
     let alive = true;
     (async () => {
-      if (!activeWs) {
-        setWsContext('');
-        return;
+      const parts: string[] = [];
+      if (activeRepo) {
+        parts.push(`当前仓库：${activeRepo.name}（${activeRepo.repoFullName ?? ''}${activeRepo.branch ? `，分支 ${activeRepo.branch}` : ''}）`);
       }
-      if (activeWs.kind === 'local' && activeWs.root) {
+      if (activeWs?.root) {
         const info = await inspectDir(activeWs.root);
         const files = info.readable ? await listDir(activeWs.root, 80) : [];
         if (!alive) return;
-        setWsContext(
-          `当前工作区是手机本地目录：${activeWs.root}（${info.readable ? `${info.entries} 个条目` : '不可读'}）\n目录中的文件（前 ${files.length} 项）：\n${files.map((f) => `- ${f}`).join('\n')}`,
+        parts.push(
+          `当前工作区是手机本地目录：${activeWs.root}（${info.readable ? `${info.entries} 个条目` : '不可读'}）\n目录中的文件（前 ${files.length} 项）：\n${files.map((f) => `- ${isSafUri(f) ? safName(f) : f}`).join('\n')}`,
         );
-      } else if (activeWs.repoFullName) {
-        if (!alive) return;
-        setWsContext(`当前工作区：${activeWs.name}（仓库：${activeWs.repoFullName}${activeWs.branch ? `，分支 ${activeWs.branch}` : ''}）`);
-      } else {
-        if (!alive) return;
-        setWsContext(`当前工作区：${activeWs.name}`);
+      } else if (activeWs?.name) {
+        parts.push(`当前工作区：${activeWs.name}`);
       }
+      if (!alive) return;
+      setWsContext(parts.join('\n'));
     })();
     return () => {
       alive = false;
     };
-  }, [activeWs]);
+  }, [activeWs, activeRepo]);
 
   const append = useCallback((b: Bubble) => {
     setMessages((prev) => [...prev, b]);
@@ -169,7 +174,7 @@ export default function ChatScreen() {  const { theme } = useTheme();
         if (planned) setPlanAwaiting(aid);
 
         // 计划工作区流动输出：计划模式下，把 AI 计划落到本地工作区文件，形成可留存的产出。
-        if (planned && activeWs?.kind === 'local' && activeWs.root && full.trim()) {
+        if (planned && activeWs?.root && !isSafUri(activeWs.root) && full.trim()) {
           const ts = new Date();
           const filePath = `${activeWs.root.replace(/\/+$/, '')}/pocketdev-plan-${ts.getTime()}.md`;
           const header = `# PocketDev 执行计划\n\n- 生成时间：${ts.toLocaleString()}\n- 工作区：${activeWs.name}\n\n`;
@@ -336,15 +341,54 @@ export default function ChatScreen() {  const { theme } = useTheme();
     [prefs.voiceEnabled, prefs.language],
   );
 
+  const chooseRepo = useCallback((repo: Workspace | null) => {
+    setRepoOpen(false);
+    setActiveRepoId(repo?.id ?? null);
+    append({
+      id: `sys-${Date.now()}`,
+      role: 'assistant',
+      text: repo ? `已选择仓库：${repo.name}${repo.repoFullName ? `（${repo.repoFullName}${repo.branch ? `，分支 ${repo.branch}` : ''}）` : ''}` : '已取消仓库上下文',
+    });
+  }, [append, setActiveRepoId]);
+
   const chooseWs = useCallback((ws: Workspace | null) => {
     setWsOpen(false);
     setActiveWorkspaceId(ws?.id ?? null);
     append({
       id: `sys-${Date.now()}`,
       role: 'assistant',
-      text: ws ? `已切换到工作区：${ws.name}${ws.repoFullName ? `（${ws.repoFullName}）` : ''}` : '已切换为无工作区模式',
+      text: ws ? `已切换到工作区：${ws.name}` : '已取消当前工作区',
     });
   }, [append, setActiveWorkspaceId]);
+
+  const addFileFrom = useCallback(
+    (path: string) => {
+      setFilePick({ visible: false, root: null });
+      (async () => {
+        const content = await readTextFile(path);
+        const name = isSafUri(path) ? safName(path) : path.split('/').filter(Boolean).pop() || path;
+        if (content == null) {
+          append({ id: `f-${Date.now()}`, role: 'assistant', text: `无法读取文件内容（过大或非文本）：${name}`, error: true });
+          return;
+        }
+        append({ id: `f-${Date.now()}`, role: 'user', text: `【引用文件 ${name}】\n${content}` });
+        scrollToEnd();
+      })();
+    },
+    [append, scrollToEnd],
+  );
+
+  const onAddFile = useCallback(() => {
+    if (activeWs?.root) {
+      Alert.alert('添加文件', '选择文件来源', [
+        { text: '当前工作区', onPress: () => setFilePick({ visible: true, root: activeWs.root! }) },
+        { text: '手机目录', onPress: () => setFilePick({ visible: true, root: null }) },
+        { text: '取消', style: 'cancel' },
+      ]);
+    } else {
+      setFilePick({ visible: true, root: null });
+    }
+  }, [activeWs]);
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -469,9 +513,11 @@ export default function ChatScreen() {  const { theme } = useTheme();
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
         <View style={[styles.composer, { paddingBottom: composerPad }]}>
           <WorkspaceSwitcher
-            name={activeWs?.name ?? null}
-            kind={activeWs?.kind}
-            onPress={() => setWsOpen(true)}
+            repoName={activeRepo?.name ?? null}
+            wsName={activeWs?.name ?? null}
+            onRepoPress={() => setRepoOpen(true)}
+            onWsPress={() => setWsOpen(true)}
+            onAddFile={onAddFile}
             onManageFiles={activeWs ? () => setFileOpen(true) : undefined}
           />
           <Composer
@@ -489,10 +535,18 @@ export default function ChatScreen() {  const { theme } = useTheme();
         </View>
       </KeyboardAvoidingView>
 
+      <RepoSheet
+        visible={repoOpen}
+        onClose={() => setRepoOpen(false)}
+        repos={repos}
+        activeId={activeRepo?.id ?? null}
+        onSelect={chooseRepo}
+      />
+
       <WorkspaceSheet
         visible={wsOpen}
         onClose={() => setWsOpen(false)}
-        workspaces={workspaces}
+        workspaces={localWorkspaces}
         activeId={activeWs?.id ?? null}
         onSelect={chooseWs}
         onCreate={() => setDirOpen(true)}
@@ -521,6 +575,14 @@ export default function ChatScreen() {  const { theme } = useTheme();
           root={activeWs.root}
         />
       ) : null}
+
+      <DirectoryPicker
+        visible={filePick.visible}
+        onClose={() => setFilePick({ visible: false, root: null })}
+        onPick={addFileFrom}
+        mode="file"
+        startPath={filePick.root ?? '/storage/emulated/0'}
+      />
 
       <HistorySheet
         visible={historyOpen}
@@ -628,7 +690,7 @@ function WorkspaceSheet({
         <View style={styles.sheetHandle} />
         <Text style={[styles.sheetTitle, { color: palette.text }]}>选择工作区</Text>
         <Text style={{ color: palette.textDim, fontSize: 13, marginBottom: 12 }}>
-          {workspaces.length ? '选择后 AI 将结合该仓库上下文回答' : '还没有工作区，可先在「仓库」页创建'}
+          {workspaces.length ? '选择后 AI 将携带该本地目录的文件上下文' : '还没有工作区，可从手机目录选择'}
         </Text>
         <Pressable onPress={() => onSelect(null)} style={[styles.wsItem, { borderColor: activeId === null ? primary : palette.border }]}>
           <View style={[styles.wsIcon, { backgroundColor: alpha(primary, 0.1) }]}>
@@ -652,6 +714,61 @@ function WorkspaceSheet({
         <Pressable onPress={onCreate} style={[styles.wsItem, { borderColor: palette.border, borderStyle: 'dashed' }]}>
           <Ionicons name="folder-open-outline" size={20} color={palette.textDim} />
           <Text style={{ color: palette.textDim, fontSize: 14, fontWeight: '600' }}>从手机目录选择工作区（含任意系统目录）</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function RepoSheet({
+  visible,
+  onClose,
+  repos,
+  activeId,
+  onSelect,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  repos: Workspace[];
+  activeId: string | null;
+  onSelect: (repo: Workspace | null) => void;
+}) {
+  const { theme } = useTheme();
+  const { palette, primary } = theme;
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  if (!visible) return null;
+  return (
+    <View style={StyleSheet.absoluteFill}>
+      <Pressable onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.32)' }]} />
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + 16, borderColor: palette.border, backgroundColor: palette.mode === 'dark' ? '#121828' : '#FFFFFF' }]}>
+        <View style={styles.sheetHandle} />
+        <Text style={[styles.sheetTitle, { color: palette.text }]}>选择仓库</Text>
+        <Text style={{ color: palette.textDim, fontSize: 13, marginBottom: 12 }}>
+          {repos.length ? '选择后 AI 将携带该仓库的元信息上下文' : '还没有仓库，可在「仓库」页添加或创建'}
+        </Text>
+        <Pressable onPress={() => onSelect(null)} style={[styles.wsItem, { borderColor: activeId === null ? primary : palette.border }]}>
+          <View style={[styles.wsIcon, { backgroundColor: alpha(primary, 0.1) }]}>
+            <Ionicons name="globe-outline" size={18} color={activeId === null ? primary : palette.textDim} />
+          </View>
+          <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600', flex: 1 }}>无仓库</Text>
+          {activeId === null ? <Ionicons name="checkmark-circle" size={20} color={primary} /> : null}
+        </Pressable>
+        {repos.map((r) => (
+          <Pressable key={r.id} onPress={() => onSelect(r)} style={[styles.wsItem, { borderColor: activeId === r.id ? primary : palette.border }]}>
+            <View style={[styles.wsIcon, { backgroundColor: alpha(primary, 0.1) }]}>
+              <Ionicons name="git-branch" size={18} color={activeId === r.id ? primary : palette.textDim} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: palette.text, fontSize: 15, fontWeight: '600' }}>{r.name}</Text>
+              {r.repoFullName ? <Text style={{ color: palette.textFaint, fontSize: 12 }} numberOfLines={1}>{r.repoFullName}</Text> : null}
+            </View>
+            {activeId === r.id ? <Ionicons name="checkmark-circle" size={20} color={primary} /> : null}
+          </Pressable>
+        ))}
+        <Pressable onPress={() => { onClose(); router.navigate('/repo'); }} style={[styles.wsItem, { borderColor: palette.border, borderStyle: 'dashed' }]}>
+          <Ionicons name="add-circle-outline" size={20} color={palette.textDim} />
+          <Text style={{ color: palette.textDim, fontSize: 14, fontWeight: '600' }}>去「仓库」页添加或创建仓库</Text>
         </Pressable>
       </View>
     </View>
