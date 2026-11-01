@@ -11,7 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { listDir, readTextFile, writeTextFile, makeDir, renamePath, removePath, stat } from '@/api/localfs';
+import { listDir, readTextFile, writeTextFile, makeDir, renamePath, removePath, stat, resolveEntry, isSafUri, safName } from '@/api/localfs';
 
 interface FileEntry {
   name: string;
@@ -39,6 +39,7 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
   const insets = useSafeAreaInsets();
 
   const [cwd, setCwd] = useState(root);
+  const [stack, setStack] = useState<string[]>([]);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [viewing, setViewing] = useState<{ path: string; name: string; content: string } | null>(null);
@@ -58,7 +59,7 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
     const names = await listDir(dir, 500);
     const out: FileEntry[] = [];
     for (const n of names) {
-      const s = await stat(`${dir.replace(/\/+$/, '')}/${n}`);
+      const s = await stat(resolveEntry(dir, n));
       if (s.exists) out.push({ name: n, isDir: s.isDirectory });
     }
     out.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name) : a.isDir ? -1 : 1));
@@ -69,14 +70,16 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
   useEffect(() => {
     if (visible) {
       setCwd(root);
+      setStack([]);
       void load(root);
     }
   }, [visible, root, load]);
 
   const open = useCallback(
     async (e: FileEntry) => {
-      const p = `${cwd.replace(/\/+$/, '')}/${e.name}`;
+      const p = resolveEntry(cwd, e.name);
       if (e.isDir) {
+        setStack((s) => [...s, cwd]);
         setCwd(p);
         void load(p);
         return;
@@ -99,7 +102,7 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
     setConfirmText('');
     if (c.type === 'rename') {
       const newName = confirmText.trim();
-      if (!newName) return;
+      if (!newName || isSafUri(c.path)) return;
       const dir = c.path.replace(/\/+$/, '').split('/').slice(0, -1).join('/');
       const ok = await renamePath(c.path, `${dir}/${newName}`);
       flash(ok ? '重命名成功' : '重命名失败');
@@ -110,13 +113,13 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
       void load(cwd);
     } else if (c.type === 'newFile') {
       const name = confirmText.trim();
-      if (!name) return;
+      if (!name || isSafUri(c.dir)) return;
       const ok = await writeTextFile(`${c.dir}/${name}`, '');
       flash(ok ? '文件已创建' : '创建失败');
       void load(cwd);
     } else if (c.type === 'newDir') {
       const name = confirmText.trim();
-      if (!name) return;
+      if (!name || isSafUri(c.dir)) return;
       const ok = await makeDir(`${c.dir}/${name}`);
       flash(ok ? '文件夹已创建' : '创建失败');
       void load(cwd);
@@ -146,7 +149,7 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
           {viewing ? (
             <>
               <View style={styles.titleRow}>
-                <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>{viewing.name}</Text>
+                <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>{isSafUri(viewing.path) ? safName(viewing.path) : viewing.name}</Text>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
                   <Pressable onPress={save} hitSlop={8} disabled={saving}>
                     <Ionicons name="save-outline" size={20} color={primary} />
@@ -171,17 +174,21 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
             <>
               <View style={styles.titleRow}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-                  <Pressable onPress={() => { if (cwd !== root) { const parent = cwd.replace(/\/+$/, '').split('/').slice(0, -1).join('/') || root; setCwd(parent); void load(parent); } }} hitSlop={8} disabled={cwd === root}>
-                    <Ionicons name="arrow-back" size={20} color={cwd === root ? palette.textFaint : palette.textDim} />
+                <Pressable onPress={() => { const s = [...stack]; const parent = s.pop(); if (parent !== undefined) { setStack(s); setCwd(parent); void load(parent); } }} hitSlop={8} disabled={cwd === root}>
+                  <Ionicons name="arrow-back" size={20} color={cwd === root ? palette.textFaint : palette.textDim} />
+                </Pressable>
+                <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>{isSafUri(cwd) ? safName(cwd) : cwd}</Text>
+              </View>
+              {!isSafUri(cwd) ? (
+                <>
+                  <Pressable onPress={() => setConfirm({ type: 'newFile', dir: cwd })} hitSlop={8}>
+                    <Ionicons name="create-outline" size={20} color={palette.textDim} />
                   </Pressable>
-                  <Text style={[styles.title, { color: palette.text }]} numberOfLines={1}>{cwd}</Text>
-                </View>
-                <Pressable onPress={() => setConfirm({ type: 'newFile', dir: cwd })} hitSlop={8}>
-                  <Ionicons name="create-outline" size={20} color={palette.textDim} />
-                </Pressable>
-                <Pressable onPress={() => setConfirm({ type: 'newDir', dir: cwd })} hitSlop={8}>
-                  <Ionicons name="folder-open-outline" size={20} color={palette.textDim} />
-                </Pressable>
+                  <Pressable onPress={() => setConfirm({ type: 'newDir', dir: cwd })} hitSlop={8}>
+                    <Ionicons name="folder-open-outline" size={20} color={palette.textDim} />
+                  </Pressable>
+                </>
+              ) : null}
                 <Pressable onPress={onClose} hitSlop={8}>
                   <Ionicons name="close" size={22} color={palette.textDim} />
                 </Pressable>
@@ -196,12 +203,12 @@ export function FileManager({ visible, onClose, root, onPick }: FileManagerProps
                     <Pressable
                       key={e.name}
                       onPress={() => open(e)}
-                      onLongPress={() => setConfirm({ type: 'rename', path: `${cwd.replace(/\/+$/, '')}/${e.name}`, name: e.name })}
+                      onLongPress={isSafUri(cwd) ? undefined : () => setConfirm({ type: 'rename', path: resolveEntry(cwd, e.name), name: e.name })}
                       style={[styles.row, { borderColor: palette.border, backgroundColor: palette.surface }]}
                     >
                       <Ionicons name={e.isDir ? 'folder' : 'document-text-outline'} size={18} color={e.isDir ? primary : palette.textDim} />
-                      <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>{e.name}</Text>
-                      <Pressable hitSlop={8} onPress={() => setConfirm({ type: 'delete', path: `${cwd.replace(/\/+$/, '')}/${e.name}`, name: e.name })}>
+                      <Text style={{ color: palette.text, fontSize: 14, flex: 1 }} numberOfLines={1}>{isSafUri(e.name) ? safName(e.name) : e.name}</Text>
+                      <Pressable hitSlop={8} onPress={() => setConfirm({ type: 'delete', path: resolveEntry(cwd, e.name), name: e.name })}>
                         <Ionicons name="trash-outline" size={16} color={palette.textFaint} />
                       </Pressable>
                     </Pressable>

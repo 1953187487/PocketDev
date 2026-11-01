@@ -18,8 +18,9 @@ import { alpha, radius, space, useTheme } from '@/theme';
 import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak } from '@/api/speech';
-import { inspectDir, listDir, writeTextFile } from '@/api/localfs';
+import { inspectDir, listDir, writeTextFile, isSafUri, safName } from '@/api/localfs';
 import { FileManager } from '@/components/FileManager';
+import { DirectoryPicker } from '@/components/DirectoryPicker';
 import { HistorySheet } from '@/components/HistorySheet';
 import { saveSession, getSession, type Session } from '@/api/sessions';
 
@@ -35,7 +36,7 @@ const SUGGESTIONS = [
 export default function ChatScreen() {  const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
-  const { provider, workspaces, setTabBarVisible, prefs, setPrefs } = useAppStore();
+  const { provider, workspaces, setTabBarVisible, prefs, setPrefs, addWorkspace, setActiveWorkspaceId } = useAppStore();
   const planMode = prefs.planMode;
   const activeWs = useActiveWorkspace();
 
@@ -43,6 +44,7 @@ export default function ChatScreen() {  const { theme } = useTheme();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [wsOpen, setWsOpen] = useState(false);
+  const [dirOpen, setDirOpen] = useState(false);
   const [keyboardOn, setKeyboardOn] = useState(false);
   const [scrollToBottom, setScrollToBottom] = useState(0);
   const [translateMsg, setTranslateMsg] = useState<{ text: string; result: string; lang: string } | null>(null);
@@ -336,12 +338,13 @@ export default function ChatScreen() {  const { theme } = useTheme();
 
   const chooseWs = useCallback((ws: Workspace | null) => {
     setWsOpen(false);
+    setActiveWorkspaceId(ws?.id ?? null);
     append({
       id: `sys-${Date.now()}`,
       role: 'assistant',
       text: ws ? `已切换到工作区：${ws.name}${ws.repoFullName ? `（${ws.repoFullName}）` : ''}` : '已切换为无工作区模式',
     });
-  }, [append]);
+  }, [append, setActiveWorkspaceId]);
 
   const renderHeader = () => (
     <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -492,7 +495,23 @@ export default function ChatScreen() {  const { theme } = useTheme();
         workspaces={workspaces}
         activeId={activeWs?.id ?? null}
         onSelect={chooseWs}
-        onCreate={() => setWsOpen(false)}
+        onCreate={() => setDirOpen(true)}
+      />
+
+      <DirectoryPicker
+        visible={dirOpen}
+        onClose={() => setDirOpen(false)}
+        onPick={(path) => {
+          setDirOpen(false);
+          setWsOpen(false);
+          const displayName = isSafUri(path) ? safName(path) : path.split('/').filter(Boolean).pop() || path;
+          addWorkspace({ name: displayName, kind: 'local', root: path });
+          append({
+            id: `sys-${Date.now()}`,
+            role: 'assistant',
+            text: `已添加本地工作区：${displayName}`,
+          });
+        }}
       />
 
       {activeWs?.root ? (
@@ -631,8 +650,8 @@ function WorkspaceSheet({
           </Pressable>
         ))}
         <Pressable onPress={onCreate} style={[styles.wsItem, { borderColor: palette.border, borderStyle: 'dashed' }]}>
-          <Ionicons name="add-circle-outline" size={20} color={palette.textDim} />
-          <Text style={{ color: palette.textDim, fontSize: 14, fontWeight: '600' }}>在仓库页创建新工作区</Text>
+          <Ionicons name="folder-open-outline" size={20} color={palette.textDim} />
+          <Text style={{ color: palette.textDim, fontSize: 14, fontWeight: '600' }}>从手机目录选择工作区（含任意系统目录）</Text>
         </Pressable>
       </View>
     </View>

@@ -3,7 +3,7 @@ import { Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { space, type, useTheme, Button, Field, SubScreen } from '@/ui';
 import { useAppStore, type Workspace } from '@/store/app';
-import { COMMON_DIRS, inspectDir, listDir, type LocalDirInfo } from '@/api/localfs';
+import { COMMON_DIRS, inspectDir, listDir, requestDirectoryPermission, isSafUri, safName, type LocalDirInfo } from '@/api/localfs';
 
 export default function LocalWorkspaceScreen() {
   const router = useRouter();
@@ -47,6 +47,13 @@ export default function LocalWorkspaceScreen() {
     setPreview([]);
   }, [inspect, addWorkspace, setActiveWorkspaceId]);
 
+  const pickSystemDir = useCallback(async () => {
+    const uri = await requestDirectoryPermission();
+    if (!uri) return;
+    await runCheck(uri);
+    setPath(uri);
+  }, [runCheck]);
+
   return (
     <SubScreen title="本地目录工作区" onBack={() => router.back()}>
       <View style={{ paddingHorizontal: space.lg }}>
@@ -54,7 +61,13 @@ export default function LocalWorkspaceScreen() {
           选择一个本地目录作为工作区，对话会自动携带该目录路径与文件清单作为上下文。Android 11+ 受系统分区存储限制，部分路径可能不可读。
         </Text>
 
-        <Text style={{ color: palette.textDim, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>快捷目录</Text>
+        <Text style={{ color: palette.textDim, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>选择目录</Text>
+        <Button
+          title="选择系统目录（可浏览任意文件夹）"
+          icon="folder-open-outline"
+          onPress={() => void pickSystemDir()}
+        />
+        <Text style={{ color: palette.textDim, fontSize: 12, fontWeight: '600', marginTop: 12, marginBottom: 6 }}>快捷目录</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginBottom: space.lg }}>
           {COMMON_DIRS.map((d) => (
             <Button key={d.path} title={d.label} small variant="secondary" onPress={() => { setPath(d.path); void runCheck(d.path); }} />
@@ -89,11 +102,11 @@ export default function LocalWorkspaceScreen() {
             {error ? <Text style={{ color: palette.danger, ...type.caption }}>{error}</Text> : null}
             {preview.length ? (
               <View style={{ borderWidth: 1, borderColor: palette.border, borderRadius: 12, padding: space.md, backgroundColor: palette.surface }}>
-                {preview.map((f) => (
-                  <Text key={f} style={{ color: palette.textDim, ...type.mono, marginBottom: 2 }}>
-                    {f}
-                  </Text>
-                ))}
+                  {preview.map((f) => (
+                    <Text key={f} style={{ color: palette.textDim, ...type.mono, marginBottom: 2 }}>
+                      {isSafUri(f) ? safName(f) : f}
+                    </Text>
+                  ))}
               </View>
             ) : null}
           </View>

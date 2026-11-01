@@ -103,7 +103,7 @@ interface AppStore {
 
   workspaces: Workspace[];
   activeWorkspaceId: string | null;
-  setActiveWorkspaceId: (id: string) => void;
+  setActiveWorkspaceId: (id: string | null) => void;
   addWorkspace: (w: Omit<Workspace, 'id'>) => Workspace;
   updateWorkspace: (id: string, patch: Partial<Workspace>) => void;
   removeWorkspace: (id: string) => void;
@@ -173,7 +173,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }) {
     void setObject(WORKSPACES_KEY, next);
   }, []);
 
-  const setActiveWorkspaceId = useCallback((id: string) => {
+  const setActiveWorkspaceId = useCallback((id: string | null) => {
     setActiveId(id);
     void setObject(ACTIVE_WS_KEY, id);
   }, []);
