@@ -1,4 +1,4 @@
-import { AuroraBackdrop, ChatBubble, Composer, SuggestionCard, type ChatBubbleData } from '@/ui';
+import { AuroraBackdrop, ChatBubble, Composer, SuggestionCard, WorkspaceSwitcher, type ChatBubbleData } from '@/ui';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
@@ -19,6 +19,7 @@ import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak } from '@/api/speech';
 import { inspectDir, listDir, writeTextFile } from '@/api/localfs';
+import { FileManager } from '@/components/FileManager';
 
 type Bubble = ChatBubbleData;
 
@@ -48,6 +49,7 @@ export default function ChatScreen() {  const { theme } = useTheme();
   const [wsContext, setWsContext] = useState('');
   const [planAwaiting, setPlanAwaiting] = useState<string | null>(null);
   const [nearBottom, setNearBottom] = useState(true);
+  const [fileOpen, setFileOpen] = useState(false);
   const listRef = useRef<FlatList<Bubble>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -333,16 +335,6 @@ export default function ChatScreen() {  const { theme } = useTheme();
             计划
           </Text>
         </Pressable>
-        <Pressable
-          onPress={() => setWsOpen(true)}
-          style={[styles.wsChip, { borderColor: activeWs ? alpha(primary, 0.5) : palette.border }]}
-        >
-          <Ionicons name="folder-open" size={13} color={activeWs ? primary : palette.textFaint} />
-          <Text style={{ color: activeWs ? primary : palette.textFaint, fontSize: 12, fontWeight: '600', maxWidth: 96 }} numberOfLines={1}>
-            {activeWs ? activeWs.name : '选择工作区'}
-          </Text>
-          <Ionicons name="chevron-down" size={12} color={activeWs ? primary : palette.textFaint} />
-        </Pressable>
       </View>
     </View>
   );
@@ -420,6 +412,12 @@ export default function ChatScreen() {  const { theme } = useTheme();
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
         <View style={[styles.composer, { paddingBottom: composerPad }]}>
+          <WorkspaceSwitcher
+            name={activeWs?.name ?? null}
+            kind={activeWs?.kind}
+            onPress={() => setWsOpen(true)}
+            onManageFiles={activeWs ? () => setFileOpen(true) : undefined}
+          />
           <Composer
             value={input}
             onChange={setInput}
@@ -443,6 +441,14 @@ export default function ChatScreen() {  const { theme } = useTheme();
         onSelect={chooseWs}
         onCreate={() => setWsOpen(false)}
       />
+
+      {activeWs?.root ? (
+        <FileManager
+          visible={fileOpen}
+          onClose={() => setFileOpen(false)}
+          root={activeWs.root}
+        />
+      ) : null}
 
       {translateMsg ? (
         <TranslateSheet

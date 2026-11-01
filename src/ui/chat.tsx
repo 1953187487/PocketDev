@@ -282,6 +282,40 @@ export function SuggestionCard({ icon, title, onPress, style }: SuggestionCardPr
   );
 }
 
+/* ---------- 工作区选择器（输入栏上方） ---------- */
+export interface WorkspaceSwitcherProps {
+  name: string | null;
+  kind?: 'git' | 'local';
+  onPress: () => void;
+  onManageFiles?: () => void;
+}
+
+export function WorkspaceSwitcher({ name, kind, onPress, onManageFiles }: WorkspaceSwitcherProps) {
+  const { theme } = useTheme();
+  const { palette, primary } = theme;
+  const active = !!name;
+  return (
+    <View style={styles.switcherRow}>
+      <Pressable
+        onPress={onPress}
+        style={[styles.switcherChip, { borderColor: active ? alpha(primary, 0.5) : palette.border, backgroundColor: active ? alpha(primary, 0.08) : 'transparent' }]}
+      >
+        <Ionicons name={active ? (kind === 'local' ? 'folder' : 'git-branch') : 'folder-open-outline'} size={14} color={active ? primary : palette.textFaint} />
+        <Text style={[styles.switcherText, { color: active ? primary : palette.textFaint }]} numberOfLines={1}>
+          {name ?? '选择工作区'}
+        </Text>
+        <Ionicons name="chevron-down" size={13} color={active ? primary : palette.textFaint} />
+      </Pressable>
+      {active && onManageFiles ? (
+        <Pressable onPress={onManageFiles} hitSlop={6} style={[styles.switcherFile, { borderColor: palette.border }]}>
+          <Ionicons name="documents-outline" size={15} color={palette.textDim} />
+          <Text style={{ color: palette.textDim, fontSize: 12.5, fontWeight: '600' }}>文件</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 /* ---------- 样式 ---------- */
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', marginBottom: space.md },
@@ -368,4 +402,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sugIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  switcherRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  switcherChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  switcherText: { flex: 1, fontSize: 12.5, fontWeight: '600' },
+  switcherFile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
 });
