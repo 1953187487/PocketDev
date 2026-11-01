@@ -80,3 +80,120 @@ export async function writeTextFile(path: string, content: string): Promise<bool
     return false;
   }
 }
+
+/* ---------- 路径安全 ---------- */
+
+/** 规范化路径：去除尾斜杠、折叠连续的斜杠。 */
+export function normalizePath(p: string): string {
+  const clean = p.trim().replace(/\/+/g, '/').replace(/\/+$/, '');
+  return clean || '/';
+}
+
+/** 拼接路径（自动处理分隔符）。 */
+export function joinPath(base: string, ...parts: string[]): string {
+  let out = normalizePath(base);
+  for (const part of parts) {
+    if (!part) continue;
+    out = out === '/' ? `/${part.replace(/^\/+|\/+$/g, '')}` : `${out}/${part.replace(/^\/+|\/+$/g, '')}`;
+  }
+  return out;
+}
+
+/** 判断 child 是否位于 base 目录之内（或相等）。纯字符串比较，不做文件系统访问。 */
+export function isInside(base: string, child: string): boolean {
+  const b = normalizePath(base);
+  const c = normalizePath(child);
+  return c === b || c.startsWith(b + '/');
+}
+
+/** 拒绝包含 .. 的路径（防目录穿越）。返回规范化后的安全路径，非法时返回 null。 */
+export function safeResolve(base: string, child: string): string | null {
+  const c = child.replace(/\/+/g, '/');
+  const segs = c.split('/').filter(Boolean);
+  const stack: string[] = [];
+  for (const seg of segs) {
+    if (seg === '.') continue;
+    if (seg === '..') {
+      if (stack.length === 0) return null;
+      stack.pop();
+      continue;
+    }
+    stack.push(seg);
+  }
+  const resolved = joinPath(base, ...stack);
+  return isInside(base, resolved) ? resolved : null;
+}
+
+/* ---------- 目录与文件操作 ---------- */
+
+export interface FileStat {
+  exists: boolean;
+  isDirectory: boolean;
+  size: number;
+  modifiedAt: number | null;
+}
+
+/** 获取文件/目录信息。 */
+export async function stat(path: string): Promise<FileStat> {
+  try {
+    const info = await FileSystem.getInfoAsync(normalizePath(path));
+    if (!info.exists) return { exists: false, isDirectory: false, size: 0, modifiedAt: null };
+    return {
+      exists: true,
+      isDirectory: !!info.isDirectory,
+      size: typeof info.size === 'number' ? info.size : 0,
+      modifiedAt: info.modificationTime ? info.modificationTime * 1000 : null,
+    };
+  } catch {
+    return { exists: false, isDirectory: false, size: 0, modifiedAt: null };
+  }
+}
+
+/** 创建目录（intermediates 时递归创建父目录）。返回是否成功。 */
+export async function makeDir(path: string, intermediates = true): Promise<boolean> {
+  try {
+    const info = await FileSystem.getInfoAsync(normalizePath(path));
+    if (info.exists && info.isDirectory) return true;
+    if (info.exists) return false;
+    await FileSystem.makeDirectoryAsync(normalizePath(path), { intermediates });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 重命名/移动文件或目录。返回是否成功。 */
+export async function renamePath(from: string, to: string): Promise<boolean> {
+  try {
+    const s = await stat(from);
+    if (!s.exists) return false;
+    await FileSystem.moveAsync({ from: normalizePath(from), to: normalizePath(to) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 删除文件或目录（目录需非空时递归删除）。返回是否成功。 */
+export async function removePath(path: string): Promise<boolean> {
+  try {
+    const s = await stat(path);
+    if (!s.exists) return true;
+    await FileSystem.deleteAsync(normalizePath(path), { idempotent: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** 复制文件或目录。返回是否成功。 */
+export async function copyPath(from: string, to: string): Promise<boolean> {
+  try {
+    const s = await stat(from);
+    if (!s.exists) return false;
+    await FileSystem.copyAsync({ from: normalizePath(from), to: normalizePath(to) });
+    return true;
+  } catch {
+    return false;
+  }
+}
