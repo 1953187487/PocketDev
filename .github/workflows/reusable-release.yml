@@ -73,9 +73,18 @@ jobs:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
+          if [ -z "${KEYSTORE_B64}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 为空。请在仓库 Settings → Secrets and variables → Actions 的「Repository secrets」里添加 release keystore 的 base64（base64 -w0 release.jks），不要放在 Environment secrets。"
+            exit 1
+          fi
           mkdir -p "$HOME/.android"
-          echo "$KEYSTORE_B64" | base64 -d > "$HOME/.android/release.jks"
-          echo "Keystore written to $HOME/.android/release.jks ($(stat -c%s "$HOME/.android/release.jks") bytes)"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$HOME/.android/release.jks"
+          size=$(stat -c%s "$HOME/.android/release.jks")
+          echo "Keystore written to $HOME/.android/release.jks ($size bytes)"
+          if [ "$size" -lt 100 ]; then
+            echo "::error::解码后的 keystore 仅 ${size} 字节，说明 ANDROID_KEYSTORE_BASE64 被截断或内容错误，请重新完整设置（整段单行 base64）。"
+            exit 1
+          fi
       - name: Prebuild Android project
         run: ${{ fromJSON(needs.config.outputs.config).build.prebuild_command }}
       - name: Build release APK
