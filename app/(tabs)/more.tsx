@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme, AuroraBackdrop } from '@/ui';
 import { useAppStore } from '@/store/app';
-import { loadApplets } from '@/api/applets';
 
 interface MoreEntry {
   icon: keyof typeof Ionicons.glyphMap;
@@ -22,25 +21,10 @@ export default function MoreScreen() {
   const { theme } = useTheme();
   const { palette, primary } = theme;
   const { workspaces } = useAppStore();
-  const [appletCount, setAppletCount] = useState(0);
-
-  useEffect(() => {
-    (async () => {
-      const list = await loadApplets();
-      setAppletCount(list.filter((a) => a.enabled).length);
-    })();
-  }, []);
 
   const localCount = workspaces.filter((w) => w.kind === 'local').length;
 
   const entries: MoreEntry[] = [
-    {
-      icon: 'construct-outline',
-      title: '开发应用',
-      subtitle: '开发可被 AI 调用的轻量功能',
-      route: '/applets',
-      badge: appletCount ? `${appletCount} 个可用` : '未创建',
-    },
     {
       icon: 'folder-open-outline',
       title: '本地目录工作区',

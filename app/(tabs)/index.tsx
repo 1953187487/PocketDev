@@ -20,7 +20,6 @@ import { alpha, radius, space, useTheme } from '@/theme';
 import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
 import { speak, stopSpeaking } from '@/api/speech';
-import { loadApplets, runApplet, buildArgs } from '@/api/applets';
 import { inspectDir, listDir, writeTextFile } from '@/api/localfs';
 import type { ProviderConfig } from '@/store/app';
 
@@ -32,39 +31,16 @@ interface Bubble {
   error?: boolean;
   /** 计划模式：AI 返回的是待确认执行计划。 */
   plan?: boolean;
-  /** Applet 调用结果展示。 */
-  tool?: boolean;
-  /** 工具调用名称（卡片标题）。 */
-  toolName?: string;
-  /** 工具执行状态：running 调用中 / done 完成 / error 失败。 */
-  toolStatus?: 'running' | 'done' | 'error';
 }
 
 const SUGGESTIONS = [
-  { icon: 'code-slash' as const, title: '写一段代码', prompt: '帮我写一段可复用的 TypeScript 工具函数' },
-  { icon: 'git-branch' as const, title: '整理仓库', prompt: '请分析当前仓库结构并给出优化建议' },
-  { icon: 'bulb' as const, title: '设计方案', prompt: '为这个需求设计一个技术方案' },
-  { icon: 'search' as const, title: '解释代码', prompt: '解释这段代码的作用和实现思路' },
+  { icon: 'code-slash' as const, title: '写个工具函数', prompt: '写个 TypeScript 工具函数' },
+  { icon: 'git-branch' as const, title: '分析仓库', prompt: '分析这个仓库的结构' },
+  { icon: 'bulb' as const, title: '出技术方案', prompt: '给这个需求出技术方案' },
+  { icon: 'search' as const, title: '解释代码', prompt: '解释这段代码' },
 ];
 
-/** 解析 AI 输出中的功能应用调用标记：@CALL: 名称 {"k":"v"} */
-function parseCall(text: string): { name: string; args: Record<string, string> } | null {
-  const m = text.match(/@CALL:\s*([^\s{]+)(\s*\{[\s\S]*?\})?/);
-  if (!m) return null;
-  let args: Record<string, string> = {};
-  if (m[2]) {
-    try {
-      const j = JSON.parse(m[2]);
-      for (const k of Object.keys(j)) args[k] = String(j[k]);
-    } catch {
-      /* ignore */
-    }
-  }
-  return { name: m[1], args };
-}
-
-export default function ChatScreen() {
-  const { theme } = useTheme();
+export default function ChatScreen() {  const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
   const { provider, providerReady, workspaces, setTabBarVisible, prefs, setPrefs } = useAppStore();
@@ -107,14 +83,6 @@ export default function ChatScreen() {
   }, [setTabBarVisible]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
-
-  const [applets, setApplets] = useState<import('@/api/applets').AppletDef[]>([]);
-  useEffect(() => {
-    (async () => {
-      const list = await loadApplets();
-      setApplets(list.filter((a) => a.enabled));
-    })();
-  }, []);
 
   // 预计算工作区上下文（本地目录列出文件清单，远端仓库携带仓库信息）。
   useEffect(() => {
@@ -160,25 +128,15 @@ export default function ChatScreen() {
   const systemPrompt = useCallback(
     (opts?: { execute?: boolean }) => {
       const parts = [
-        '你是 PocketDev 内置的 AI 开发助手，专业、可靠、语言与用户保持一致（默认使用中文）。',
-        '请给出结构清晰、可直接使用的回答；涉及代码时用 Markdown 代码块，并注明语言。',
+        '你是 PocketDev 的 AI 开发助手，回答简洁、结构清晰，代码用 Markdown 代码块并标注语言。',
       ];
-      if (wsContext) parts.push(`${wsContext}\n回答时优先结合该工作区上下文。`);
-      if (applets.length) {
-        const list = applets
-          .map((a) => `- ${a.name}（参数：${a.params.map((p) => p.key).join(', ') || '无'}）：${a.description || '无说明'}`)
-          .join('\n');
-        parts.push(
-          '你可以调用以下功能应用。需要调用时，单独一行输出标记：@CALL: 名称 以及参数键值对（JSON）。系统会执行并把结果反馈给你，然后你继续回答。仅使用列出的功能应用。\n可用功能应用：\n' +
-            list,
-        );
-      }
+      if (wsContext) parts.push(`${wsContext}\n优先结合该工作区上下文回答。`);
       if (planMode && !opts?.execute) {
         parts.push('当前处于计划模式：先输出编号的分步骤执行计划，结尾询问「是否按计划执行？」，等待确认后再实现细节。');
       }
       return parts.join('\n');
     },
-    [wsContext, applets, planMode],
+    [wsContext, planMode],
   );
 
   const runTurn = useCallback(
@@ -189,7 +147,7 @@ export default function ChatScreen() {
       scrollToEnd();
 
       const history = historySrc
-        .filter((m) => !m.error && !m.tool)
+        .filter((m) => !m.error)
         .map((m) => ({ role: m.role, content: m.text }))
         .slice(-14);
       const controller = new AbortController();
@@ -224,37 +182,8 @@ export default function ChatScreen() {
             text: ok
               ? `计划已写入工作区文件：\n${filePath}`
               : `写入工作区文件失败：${filePath}`,
-            tool: true,
+            error: !ok,
           });
-        }
-
-        const call = parseCall(full);
-        if (call && !planMode) {
-          const applet = applets.find((a) => a.name === call.name);
-          const tid = `t-${Date.now()}`;
-          if (!applet) {
-            append({ id: tid, role: 'assistant', text: `未找到功能应用「${call.name}」，请检查名称。`, error: true, tool: true, toolName: call.name, toolStatus: 'error' });
-          } else {
-            append({ id: tid, role: 'assistant', text: `调用功能应用「${applet.name}」…`, tool: true, toolName: applet.name, toolStatus: 'running', streaming: true });
-            const r = await runApplet(applet, provider, buildArgs(applet.params, call.args));
-            const out = r.ok
-              ? typeof r.value === 'string'
-                ? r.value
-                : JSON.stringify(r.value, null, 2)
-              : `失败：${r.error}`;
-            patch(tid, (b) => ({ ...b, text: `功能应用「${applet.name}」结果：\n${out}`, streaming: false, toolStatus: r.ok ? 'done' : 'error' }));
-            setSending(false);
-            abortRef.current = null;
-            await runTurn(
-              `功能应用「${applet.name}」已执行，结果如下：\n${out}\n请基于该结果继续回答。`,
-              [
-                ...historySrc,
-                { id: aid, role: 'assistant', text: full },
-                { id: tid, role: 'assistant', text: `功能应用结果：${out}`, tool: true, toolName: applet.name, toolStatus: r.ok ? 'done' : 'error' },
-              ],
-            );
-            return;
-          }
         }
       } catch (e) {
         const err = e as Error;
@@ -274,7 +203,7 @@ export default function ChatScreen() {
         abortRef.current = null;
       }
     },
-    [append, patch, scrollToEnd, provider, systemPrompt, applets, planMode, activeWs],
+    [append, patch, scrollToEnd, provider, systemPrompt, planMode, activeWs],
   );
 
   const send = useCallback(
@@ -526,31 +455,27 @@ export default function ChatScreen() {
           <Ionicons name="sparkles" size={13} color={primaryText} />
         </View>
         <View style={{ flex: 1 }}>
-          {item.tool ? (
-            <ToolCallCard item={item} palette={palette} primary={primary} primaryText={primaryText} />
-          ) : (
-            <View
-              style={[
-                styles.bubble,
-                styles.bubbleAi,
-                {
-                  borderColor: alpha(primary, palette.mode === 'dark' ? 0.16 : 0.12),
-                  backgroundColor: palette.surface,
-                  shadowColor: palette.shadow,
-                  shadowOpacity: 0.1,
-                  shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 6 },
-                  elevation: 2,
-                },
-              ]}
-            >
-              {item.text ? (
-                <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 22 }}>{item.text}</Text>
-              ) : (
-                <TypingDots color={primary} />
-              )}
-            </View>
-          )}
+          <View
+            style={[
+              styles.bubble,
+              styles.bubbleAi,
+              {
+                borderColor: alpha(primary, palette.mode === 'dark' ? 0.16 : 0.12),
+                backgroundColor: palette.surface,
+                shadowColor: palette.shadow,
+                shadowOpacity: 0.1,
+                shadowRadius: 14,
+                shadowOffset: { width: 0, height: 6 },
+                elevation: 2,
+              },
+            ]}
+          >
+            {item.text ? (
+              <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 22 }}>{item.text}</Text>
+            ) : (
+              <TypingDots color={primary} />
+            )}
+          </View>
           {item.text && !item.streaming && prefs.translateEnabled ? (
             <View style={styles.msgActions}>
               <Pressable hitSlop={8} onPress={() => doTranslate(item.text, prefs.language === 'en' ? 'zh' : 'en')} style={styles.msgAction}>
@@ -732,52 +657,6 @@ function TranslateSheet({
   );
 }
 
-function ToolCallCard({
-  item,
-  palette,
-  primary,
-  primaryText,
-}: {
-  item: Bubble;
-  palette: ReturnType<typeof useTheme>['theme']['palette'];
-  primary: string;
-  primaryText: string;
-}) {
-  const status = item.toolStatus ?? 'done';
-  const color = status === 'error' ? palette.danger : status === 'running' ? primary : palette.success;
-  const label = status === 'error' ? '调用失败' : status === 'running' ? '调用中…' : '调用完成';
-  const icon = status === 'error' ? 'close-circle' : status === 'running' ? 'ellipsis-horizontal' : 'checkmark-circle';
-  const output = item.text.replace(/^(功能应用「.*?」结果：\n|功能应用结果：)/, '').trim();
-  return (
-    <View style={[styles.toolCard, { borderColor: alpha(color, 0.35), backgroundColor: alpha(color, 0.07) }]}>
-      <View style={styles.toolHead}>
-        <View style={[styles.toolIcon, { backgroundColor: alpha(color, 0.16) }]}>
-          <Ionicons name="construct" size={15} color={color} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '700' }} numberOfLines={1}>
-            {item.toolName ?? '功能应用'}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-            <Ionicons name={icon} size={12} color={color} />
-            <Text style={{ color, fontSize: 11.5, fontWeight: '600' }}>{label}</Text>
-          </View>
-        </View>
-        {status === 'running' ? <TypingDots color={color} small /> : null}
-      </View>
-      {output ? (
-        <Text
-          style={[styles.toolOutput, { color: status === 'error' ? palette.danger : palette.textDim, backgroundColor: palette.surfaceSunken }]}
-          numberOfLines={6}
-          selectable
-        >
-          {output}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
 function TypingDots({ color, small }: { color: string; small?: boolean }) {
   const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0.2)).current, useRef(new Animated.Value(0.4)).current];
   useEffect(() => {
@@ -917,18 +796,6 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '82%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: radius.xl },
   bubbleUser: { borderBottomRightRadius: 8 },
   bubbleAi: { borderBottomLeftRadius: 8 },
-  toolCard: { borderWidth: 1, borderRadius: radius.lg, padding: 12, marginBottom: 2 },
-  toolHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  toolIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  toolOutput: {
-    fontSize: 12.5,
-    lineHeight: 18,
-    marginTop: 10,
-    padding: 10,
-    borderRadius: radius.md,
-    fontFamily: 'monospace',
-    overflow: 'hidden',
-  },
   msgActions: { flexDirection: 'row', gap: 12, marginTop: 6, paddingHorizontal: 2 },
   planConfirm: {
     flexDirection: 'row',
