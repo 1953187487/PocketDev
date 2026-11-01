@@ -20,16 +20,27 @@ export interface Contributor {
 
 export const MAIN_DEVELOPER: Developer = {
   name: '万古沧海',
-  role: '主开发者 · 总负责 · 仓库维护',
-  tag: '维护者',
+  role: '作者 · 总负责 · 仓库维护',
+  tag: '作者',
   link: 'https://b23.tv/H10fiEa',
   socials: [
     { platform: '哔哩哔哩', label: '万古沧海的个人空间', url: 'https://b23.tv/H10fiEa' },
   ],
 };
 
+export const MAINTAINER: Developer = {
+  name: '永却无敌',
+  role: '维护者 · Bug 总结与修复',
+  tag: '维护者',
+  link: 'https://b23.tv/Q6jnoiwB',
+  socials: [
+    { platform: '哔哩哔哩', label: '永却无敌的个人空间', url: 'https://b23.tv/Q6jnoiwB' },
+  ],
+};
+
 export const DEVELOPERS: Developer[] = [
   MAIN_DEVELOPER,
+  MAINTAINER,
 ];
 
 export const CONTRIBUTORS: Contributor[] = [
