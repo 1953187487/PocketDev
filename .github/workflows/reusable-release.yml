@@ -69,13 +69,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Decode release keystore
+        id: keystore
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
           if [ -z "${KEYSTORE_B64}" ]; then
-            echo "::error::ANDROID_KEYSTORE_BASE64 为空。请在仓库 Settings → Secrets and variables → Actions 的「Repository secrets」里添加 release keystore 的 base64（base64 -w0 release.jks），不要放在 Environment secrets。"
-            exit 1
+            echo "::warning::ANDROID_KEYSTORE_BASE64 为空，跳过签名，仅上传未签名 APK（artifact apk-unsigned-*）。请在仓库 Settings → Secrets 里补全后再正常发布。"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           mkdir -p "$HOME/.android"
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$HOME/.android/release.jks"
@@ -85,6 +87,7 @@ jobs:
             echo "::error::解码后的 keystore 仅 ${size} 字节，说明 ANDROID_KEYSTORE_BASE64 被截断或内容错误，请重新完整设置（整段单行 base64）。"
             exit 1
           fi
+          echo "present=true" >> "$GITHUB_OUTPUT"
       - name: Prebuild Android project
         run: ${{ fromJSON(needs.config.outputs.config).build.prebuild_command }}
       - name: Build release APK
@@ -104,7 +107,15 @@ jobs:
             echo "org.gradle.jvmargs -> $(grep '^org.gradle.jvmargs' gradle.properties)"
           fi
           ${{ fromJSON(needs.config.outputs.config).build.gradle_command }} ${{ fromJSON(needs.config.outputs.config).build.gradle_flags }}
+      - name: Upload unsigned APK (local-signing fallback)
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-unsigned-${{ github.run_number }}
+          path: ${{ fromJSON(needs.config.outputs.config).workdir }}/${{ fromJSON(needs.config.outputs.config).build.apk_dir }}/*.apk
+          if-no-files-found: error
+          retention-days: 30
       - name: Sign APK with release keystore
+        if: steps.keystore.outputs.present == 'true'
         env:
           KEYSTORE: ${{ runner.temp }}/release.jks
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -144,6 +155,7 @@ jobs:
           if [ "$REF_TYPE" = "tag" ]; then tag="$REF_NAME"; else tag="v$ver"; fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Upload APK and checksum
+        if: steps.keystore.outputs.present == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: apk-${{ github.run_number }}
@@ -151,6 +163,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
       - name: Create GitHub Release
+        if: steps.keystore.outputs.present == 'true'
         env:
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
