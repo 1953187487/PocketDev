@@ -29,7 +29,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   const name = nameMatch ? nameMatch[1].trim() : tag;
   const dateMatch = html.match(/datetime="([^"]+)"/);
   const publishedAt = dateMatch ? dateMatch[1] : '';
-  const assetMatch = html.match(/\/releases\/download\/(v?[0-9][^"'\s<>]+?\.apk)/);
+  const assetMatch = html.match(/\/releases\/download\/[^"'\s<>]*?\.apk(?=["'\s<>]|$)/);
   const notes = extractReleaseNotes(html);
   return {
     tag,
@@ -37,7 +37,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
     published_at: publishedAt,
     url: `https://github.com/${APP_REPO}/releases/tag/${tag}`,
     notes,
-    download_url: assetMatch ? `https://github.com${assetMatch[0]}` : buildDownloadUrl(tag),
+    download_url: assetMatch ? `https://github.com/${APP_REPO}${assetMatch[0]}` : buildDownloadUrl(tag),
   };
 }
 
@@ -83,7 +83,7 @@ export async function checkForUpdate(): Promise<{ hasUpdate: boolean; release: R
 
 export function buildDownloadUrl(tag: string): string {
   const v = tag.replace(/^v/, '');
-  return `https://github.com/${APP_REPO}/releases/download/${tag}/pocketdev-v${v}.apk`;
+  return `https://github.com/${APP_REPO}/releases/download/${tag}/pocketdev-${v}.apk`;
 }
 
 export function normalizeBaseUrl(url: string): string {
