@@ -51,3 +51,14 @@ Entries discovered by the Agent during task execution should follow this format:
   - 签名 keystore 本地副本在 `dist/pocketdev-release.jks`（`dist/` 已 gitignore，不入库），base64 单行在 `dist/keystore-base64.txt`；密码/alias 只存 Actions Secrets，绝不进仓库或日志。验证签名：`apksigner verify --verbose --print-certs app.apk`，检查 v2/v3 scheme 为 true 且证书 SHA-256 匹配 keystore 指纹。
   - Release 资产名由 `release.artifact_prefix` + 版本组成（如 `pocketdev-1.0.5.apk`），app 内 `buildDownloadUrl` 必须对齐 CI 产出命名（`pocketdev-{version}.apk`，无 `v` 前缀），否则更新下载 404。历史 v1.0.0-1.0.3 亦为此命名。
   - `gh release create` 在 reusable workflow 里必须显式传 `GH_TOKEN: ${{ github.token }}`（顶层 `permissions: contents: write`），否则报 "To use GitHub CLI... set GH_TOKEN"。
+
+[Project Knowledge Summary]
+- Date: 2026-11-01
+- Context: Discovered by Agent while implementing PocketDev v1.0.6 (UI 底层/会话/仓库拉取/脚手架)
+- Category: Build Methods / Environment Configuration / Workflow & Collaboration
+- Instructions:
+  - 本地文件校验：`src/api/localfs.ts` 现提供 `normalizePath/joinPath/isInside/safeResolve/stat/makeDir/renamePath/removePath/copyPath`，路径操作先过 `safeResolve`（拒绝 `..` 逃逸）。
+  - 仓库源码拉取：`src/api/gitClone.ts` 用 GitHub REST `git/trees?recursive=1` + `git/blobs`，单文件 ≤5MB、≤2000 文件、跳过 node_modules/.git/build/dist 与二进制扩展，进度/取消走 AbortSignal；base64 解码需按 UTF-8（RN 无 Buffer，`atob` + `decodeURIComponent`）。
+  - Android 脚手架：`src/api/scaffold.ts` 生成 settings.gradle/build.gradle/gradle.properties/app 模块/AndroidManifest/MainActivity.kt/README，包名校验 `isValidPackageName`（小写点分，至少两段）。
+  - 会话持久化：`src/api/sessions.ts`（`listSessions/getSession/saveSession/deleteSession/clearSessions/searchSessions`），上限 50 条，主页 600ms 去抖自动保存，`system` 角色消息不入气泡。
+  - v1.0.6 版本号三处一致：`package.json` / `app.json`（version + android.versionCode=7）/ `src/config.ts` `APP_VERSION`。

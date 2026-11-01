@@ -1,6 +1,6 @@
 {
   "name": "pocketdev",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "手机端 AI 开发工具（基于 chaitin/MonkeyCode 底层能力）",
   "main": "expo-router/entry",
   "scripts": {

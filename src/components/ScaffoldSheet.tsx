@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { alpha, radius, space, useTheme } from '@/theme';
+import { radius, space, useTheme } from '@/theme';
 import { generateAndroidScaffold } from '@/api/scaffold';
 
 export interface ScaffoldSheetProps {
