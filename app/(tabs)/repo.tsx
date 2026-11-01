@@ -1,5 +1,5 @@
 import { Button, EmptyState, Field, IconButton, Pill, Row, Screen, SectionLabel, Spacer, Surface } from '@/ui';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -14,16 +14,27 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system/legacy';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { useAppStore, type Workspace } from '@/store/app';
+import { useAppStore } from '@/store/app';
 import { createRepo, GIT_HOSTS, listRepos, type Repo } from '@/api/git';
+import { cloneRepoToDir } from '@/api/gitClone';
+
+interface CloneState {
+  running: boolean;
+  progress: number;
+  total: number;
+  current: string;
+}
 
 export default function RepoScreen() {
   const { theme } = useTheme();
   const { palette, primary } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { git, gitReady, workspaces, addWorkspace, removeWorkspace } = useAppStore();
+  const { git, gitReady, workspaces, addWorkspace, removeWorkspace, setActiveWorkspaceId } = useAppStore();
+  const [cloning, setCloning] = useState<Record<string, CloneState>>({});
+  const abortRef = useRef<AbortController | null>(null);
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,8 +68,7 @@ export default function RepoScreen() {
     if (gitReady) load();
   }, [gitReady, load]);
 
-  const doCreate = useCallback(async () => {
-    const n = name.trim();
+  const doCreate = useCallback(async () => {    const n = name.trim();
     if (!n) {
       Alert.alert('请输入仓库名');
       return;
@@ -79,6 +89,50 @@ export default function RepoScreen() {
       setCreating(false);
     }
   }, [name, desc, isPrivate, git, addWorkspace, load]);
+
+  const doClone = useCallback(
+    async (repo: Repo) => {
+      if (cloning[repo.fullName]?.running) return;
+      if (!git.token.trim()) {
+        Alert.alert('未配置令牌', '请先在「设置 → 访问令牌」配置');
+        return;
+      }
+      const key = repo.fullName;
+      const abort = new AbortController();
+      abortRef.current = abort;
+      setCloning((s) => ({ ...s, [key]: { running: true, progress: 0, total: 0, current: '获取文件清单…' } }));
+      try {
+        const dir = `${FileSystem.documentDirectory ?? ''}repos/${key.replace(/[^\w.-]/g, '_')}`;
+        const result = await cloneRepoToDir(git, repo.owner, repo.name, repo.defaultBranch ?? 'main', dir, {
+          signal: abort.signal,
+          onProgress: (p) =>
+            setCloning((s) => ({ ...s, [key]: { running: true, progress: p.done, total: p.total, current: p.current } })),
+        });
+        const ws = addWorkspace({
+          name: repo.name,
+          kind: 'local',
+          root: dir,
+          repoFullName: repo.fullName,
+          repoUrl: repo.url,
+          branch: repo.defaultBranch,
+        });
+        setActiveWorkspaceId(ws.id);
+        Alert.alert(
+          '源码拉取完成',
+          `已写入 ${result.written} 个文件（跳过 ${result.skipped} 个），并加入工作区。点击「对话」即可带着源码上下文开发。`,
+        );
+      } catch (e) {
+        const err = e as Error;
+        Alert.alert('拉取失败', err.name === 'AbortError' ? '已取消' : err.message);
+      } finally {
+        abortRef.current = null;
+        setCloning((s) => ({ ...s, [key]: { running: false, progress: 0, total: 0, current: '' } }));
+      }
+    },
+    [git, cloning, addWorkspace, setActiveWorkspaceId],
+  );
+
+  const cancelClone = useCallback(() => abortRef.current?.abort(), []);
 
   return (
     <Screen edges={false}>
@@ -162,9 +216,18 @@ export default function RepoScreen() {
                 {w.repoUrl ? (
                   <>
                     <Spacer h={10} />
-                    <Pressable onPress={() => Linking.openURL(w.repoUrl!)}>
-                      <Text style={{ color: primary, fontSize: 12.5, fontWeight: '600' }}>在浏览器打开 →</Text>
-                    </Pressable>
+                    <Row style={{ justifyContent: 'space-between' }}>
+                      <Pressable onPress={() => Linking.openURL(w.repoUrl!)}>
+                        <Text style={{ color: primary, fontSize: 12.5, fontWeight: '600' }}>在浏览器打开 →</Text>
+                      </Pressable>
+                      {w.repoFullName ? (
+                        <Pressable onPress={() => doClone({ fullName: w.repoFullName!, name: w.name, owner: w.repoFullName!.split('/')[0], url: w.repoUrl!, defaultBranch: w.branch })} disabled={cloning[w.repoFullName!]?.running}>
+                          <Text style={{ color: cloning[w.repoFullName!]?.running ? palette.textFaint : primary, fontSize: 12.5, fontWeight: '600' }}>
+                            {cloning[w.repoFullName!]?.running ? '拉取中…' : '自动拉取源码'}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </Row>
                   </>
                 ) : null}
               </Surface>
@@ -226,6 +289,21 @@ export default function RepoScreen() {
                     onPress={() => Linking.openURL(r.url)}
                   />
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Button
+                    title={cloning[r.fullName]?.running ? '拉取中…' : '拉取源码'}
+                    small
+                    variant="ghost"
+                    icon="download-outline"
+                    loading={cloning[r.fullName]?.running}
+                    onPress={() => doClone(r)}
+                  />
+                </View>
+                {cloning[r.fullName]?.running ? (
+                  <Pressable onPress={cancelClone} hitSlop={8}>
+                    <Text style={{ color: palette.danger, fontSize: 12, fontWeight: '700' }}>取消</Text>
+                  </Pressable>
+                ) : null}
               </Row>
             </Surface>
           ))}
