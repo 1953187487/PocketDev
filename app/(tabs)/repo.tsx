@@ -19,6 +19,7 @@ import { alpha, radius, space, useTheme } from '@/theme';
 import { useAppStore } from '@/store/app';
 import { createRepo, GIT_HOSTS, listRepos, type Repo } from '@/api/git';
 import { cloneRepoToDir } from '@/api/gitClone';
+import { ScaffoldSheet } from '@/components/ScaffoldSheet';
 
 interface CloneState {
   running: boolean;
@@ -35,6 +36,7 @@ export default function RepoScreen() {
   const { git, gitReady, workspaces, addWorkspace, removeWorkspace, setActiveWorkspaceId } = useAppStore();
   const [cloning, setCloning] = useState<Record<string, CloneState>>({});
   const abortRef = useRef<AbortController | null>(null);
+  const [scaffoldFor, setScaffoldFor] = useState<{ id: string; name: string; root: string } | null>(null);
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -230,6 +232,14 @@ export default function RepoScreen() {
                     </Row>
                   </>
                 ) : null}
+                {w.kind === 'local' && w.root ? (
+                  <>
+                    <Spacer h={10} />
+                    <Pressable onPress={() => setScaffoldFor({ id: w.id, name: w.name, root: w.root! })}>
+                      <Text style={{ color: primary, fontSize: 12.5, fontWeight: '600' }}>生成 Android 脚手架 →</Text>
+                    </Pressable>
+                  </>
+                ) : null}
               </Surface>
             ))
           )}
@@ -340,6 +350,19 @@ export default function RepoScreen() {
           </View>
         </View>
       </Modal>
+
+      {scaffoldFor ? (
+        <ScaffoldSheet
+          visible={!!scaffoldFor}
+          root={scaffoldFor.root}
+          workspaceName={scaffoldFor.name}
+          onClose={() => setScaffoldFor(null)}
+          onDone={(files) => {
+            setScaffoldFor(null);
+            Alert.alert('脚手架已生成', `已写入 ${files.length} 个文件：\n${files.slice(0, 8).join('\n')}${files.length > 8 ? `\n… 共 ${files.length} 个` : ''}`);
+          }}
+        />
+      ) : null}
     </Screen>
   );
 }
