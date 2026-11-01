@@ -8,7 +8,6 @@ import {
   StyleProp,
   StyleSheet,
   Text,
-  TextStyle,
   View,
   ViewStyle,
 } from 'react-native';

@@ -1,8 +1,6 @@
-import { AuroraBackdrop } from '@/ui';
+import { AuroraBackdrop, ChatBubble, Composer, SuggestionCard, type ChatBubbleData } from '@/ui';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Easing,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -19,19 +17,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { useAppStore, useActiveWorkspace, type Workspace } from '@/store/app';
 import { streamChat, translateText, TRANSLATE_LANGS, ChatError } from '@/api/ai';
-import { speak, stopSpeaking } from '@/api/speech';
+import { speak } from '@/api/speech';
 import { inspectDir, listDir, writeTextFile } from '@/api/localfs';
-import type { ProviderConfig } from '@/store/app';
 
-interface Bubble {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-  streaming?: boolean;
-  error?: boolean;
-  /** 计划模式：AI 返回的是待确认执行计划。 */
-  plan?: boolean;
-}
+type Bubble = ChatBubbleData;
 
 const SUGGESTIONS = [
   { icon: 'code-slash' as const, title: '写个工具函数', prompt: '写个 TypeScript 工具函数' },
@@ -43,7 +32,7 @@ const SUGGESTIONS = [
 export default function ChatScreen() {  const { theme } = useTheme();
   const { palette, primary, primaryText } = theme;
   const insets = useSafeAreaInsets();
-  const { provider, providerReady, workspaces, setTabBarVisible, prefs, setPrefs } = useAppStore();
+  const { provider, workspaces, setTabBarVisible, prefs, setPrefs } = useAppStore();
   const planMode = prefs.planMode;
   const activeWs = useActiveWorkspace();
 
@@ -58,6 +47,7 @@ export default function ChatScreen() {  const { theme } = useTheme();
   const [pending, setPending] = useState<string | null>(null);
   const [wsContext, setWsContext] = useState('');
   const [planAwaiting, setPlanAwaiting] = useState<string | null>(null);
+  const [nearBottom, setNearBottom] = useState(true);
   const listRef = useRef<FlatList<Bubble>>(null);
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<TextInput>(null);
@@ -142,7 +132,7 @@ export default function ChatScreen() {  const { theme } = useTheme();
   const runTurn = useCallback(
     async (content: string, historySrc: Bubble[], opts?: { execute?: boolean }) => {
       const aid = `a-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-      append({ id: aid, role: 'assistant', text: '', streaming: true });
+      append({ id: aid, role: 'assistant', text: '', streaming: true, thinking: 'AI 正在思考…' });
       setSending(true);
       scrollToEnd();
 
@@ -381,129 +371,23 @@ export default function ChatScreen() {  const { theme } = useTheme();
       </Text>
       <View style={styles.suggestions}>
         {SUGGESTIONS.map((s) => (
-          <Pressable
-            key={s.title}
-            onPress={() => send(s.prompt)}
-            style={({ pressed }) => [
-              styles.sug,
-              { borderColor: palette.border, backgroundColor: palette.surface, opacity: pressed ? 0.8 : 1 },
-            ]}
-          >
-            <View style={[styles.sugIcon, { backgroundColor: alpha(primary, 0.12) }]}>
-              <Ionicons name={s.icon} size={16} color={primary} />
-            </View>
-            <Text style={{ color: palette.text, fontSize: 13, fontWeight: '600' }}>{s.title}</Text>
-            <Ionicons name="arrow-up-outline" size={13} color={palette.textFaint} />
-          </Pressable>
+          <SuggestionCard key={s.title} icon={s.icon} title={s.title} onPress={() => send(s.prompt)} style={styles.sug} />
         ))}
       </View>
     </View>
   );
 
-  const renderItem = ({ item }: { item: Bubble }) => {
-    if (item.role === 'user') {
-      return (
-        <View style={[styles.row, styles.rowUser]}>
-          <View
-            style={[
-              styles.bubble,
-              styles.bubbleUser,
-              {
-                backgroundColor: alpha(primary, palette.mode === 'dark' ? 0.28 : 0.92),
-                borderColor: alpha(primary, palette.mode === 'dark' ? 0.4 : 0.24),
-                borderWidth: 1,
-                shadowColor: primary,
-                shadowOpacity: palette.mode === 'dark' ? 0.22 : 0.14,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 4 },
-                elevation: 3,
-              },
-            ]}
-          >
-            <Text style={{ color: palette.mode === 'dark' ? '#F2F6FF' : '#0E1526', fontSize: 15, lineHeight: 21 }}>{item.text}</Text>
-          </View>
-          {item.text && !item.streaming && prefs.translateEnabled ? (
-            <View style={styles.msgActions}>
-              <Pressable hitSlop={8} onPress={() => doTranslate(item.text, prefs.language === 'en' ? 'zh' : 'en')} style={styles.msgAction}>
-                <Ionicons name="language-outline" size={15} color={palette.textFaint} />
-              </Pressable>
-              {prefs.voiceEnabled ? (
-                <Pressable hitSlop={8} onPress={() => doSpeak(item.text)} style={styles.msgAction}>
-                  <Ionicons name="volume-medium-outline" size={15} color={palette.textFaint} />
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-        </View>
-      );
-    }
-    return (
-      <View style={[styles.row, styles.rowAi]}>
-        <View
-          style={[
-            styles.aiAvatar,
-            {
-              backgroundColor: primary,
-              shadowColor: primary,
-              shadowOpacity: 0.35,
-              shadowRadius: 10,
-              shadowOffset: { width: 0, height: 3 },
-              elevation: 4,
-            },
-          ]}
-        >
-          <Ionicons name="sparkles" size={13} color={primaryText} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <View
-            style={[
-              styles.bubble,
-              styles.bubbleAi,
-              {
-                borderColor: alpha(primary, palette.mode === 'dark' ? 0.16 : 0.12),
-                backgroundColor: palette.surface,
-                shadowColor: palette.shadow,
-                shadowOpacity: 0.1,
-                shadowRadius: 14,
-                shadowOffset: { width: 0, height: 6 },
-                elevation: 2,
-              },
-            ]}
-          >
-            {item.text ? (
-              <Text style={{ color: item.error ? palette.danger : palette.text, fontSize: 15, lineHeight: 22 }}>{item.text}</Text>
-            ) : (
-              <TypingDots color={primary} />
-            )}
-          </View>
-          {item.text && !item.streaming && prefs.translateEnabled ? (
-            <View style={styles.msgActions}>
-              <Pressable hitSlop={8} onPress={() => doTranslate(item.text, prefs.language === 'en' ? 'zh' : 'en')} style={styles.msgAction}>
-                <Ionicons name="language-outline" size={15} color={palette.textFaint} />
-              </Pressable>
-              {prefs.voiceEnabled ? (
-                <Pressable hitSlop={8} onPress={() => doSpeak(item.text)} style={styles.msgAction}>
-                  <Ionicons name="volume-medium-outline" size={15} color={palette.textFaint} />
-                </Pressable>
-              ) : null}
-            </View>
-          ) : null}
-          {item.plan && planAwaiting === item.id ? (
-            <Pressable
-              onPress={confirmPlan}
-              style={[
-                styles.planConfirm,
-                { borderColor: alpha(primary, 0.55), backgroundColor: alpha(primary, 0.12) },
-              ]}
-            >
-              <Ionicons name="play-circle" size={15} color={primary} />
-              <Text style={{ color: primary, fontSize: 13, fontWeight: '700' }}>确认执行计划</Text>
-            </Pressable>
-          ) : null}
-        </View>
-      </View>
-    );
-  };
+  const renderItem = ({ item }: { item: Bubble }) => (
+    <ChatBubble
+      data={item}
+      canTranslate={!!item.text && !item.streaming && prefs.translateEnabled}
+      canSpeak={prefs.voiceEnabled}
+      onTranslate={item.role === 'assistant' ? (t) => doTranslate(t, prefs.language === 'en' ? 'zh' : 'en') : undefined}
+      onSpeak={(t) => doSpeak(t)}
+      showPlanConfirm={!!item.plan && planAwaiting === item.id}
+      onConfirmPlan={confirmPlan}
+    />
+  );
 
   const TAB_BAR_HEIGHT = 58;
   const composerPad = keyboardOn ? Math.max(insets.bottom, 8) : TAB_BAR_HEIGHT + Math.max(insets.bottom, 10) + 12;
@@ -525,54 +409,29 @@ export default function ChatScreen() {  const { theme } = useTheme();
         ]}
         keyboardShouldPersistTaps="handled"
         extraData={scrollToBottom}
+        onScroll={(e) => {
+          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+          setNearBottom(contentOffset.y + layoutMeasurement.height >= contentSize.height - 80);
+        }}
+        scrollEventThrottle={64}
         onContentSizeChange={() => {
-          if (messages.length) listRef.current?.scrollToEnd({ animated: true });
+          if (messages.length && nearBottom) listRef.current?.scrollToEnd({ animated: !sending });
         }}
       />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} pointerEvents="box-none">
         <View style={[styles.composer, { paddingBottom: composerPad }]}>
-          {pending ? (
-            <View style={[styles.pendingBar, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-              <Ionicons name="time-outline" size={14} color={palette.textFaint} />
-              <Text style={{ color: palette.textDim, fontSize: 12, flex: 1 }} numberOfLines={1}>
-                待发送：{pending}
-              </Text>
-              <Pressable
-                onPress={sendNow}
-                style={[styles.pendingBtn, { backgroundColor: alpha(primary, 0.14), borderColor: alpha(primary, 0.45) }]}
-              >
-                <Text style={{ color: primary, fontSize: 12, fontWeight: '700' }}>立即发送</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <View style={[styles.composerBox, { borderColor: palette.border, backgroundColor: palette.surfaceRaised.startsWith('#') && palette.mode === 'dark' ? palette.surfaceRaised : palette.surface }]}>
-            <TextInput
-              ref={inputRef}
-              value={input}
-              onChangeText={setInput}
-              placeholder="输入消息…"
-              placeholderTextColor={palette.textFaint}
-              multiline
-              style={[styles.composerInput, { color: palette.text }]}
-              onFocus={() => scrollToEnd()}
-            />
-            {sending ? (
-              <Pressable onPress={stop} style={[styles.sendBtn, { backgroundColor: palette.surfaceSunken, borderColor: palette.border }]}>
-                <Ionicons name="stop" size={17} color={palette.text} />
-              </Pressable>
-            ) : (
-              <Pressable
-                onPress={() => send(input)}
-                disabled={!input.trim()}
-                style={[
-                  styles.sendBtn,
-                  { backgroundColor: input.trim() ? primary : palette.surfaceSunken, borderColor: input.trim() ? primary : palette.border },
-                ]}
-              >
-                <Ionicons name="arrow-up" size={17} color={input.trim() ? primaryText : palette.textFaint} />
-              </Pressable>
-            )}
-          </View>
+          <Composer
+            value={input}
+            onChange={setInput}
+            onSend={() => send(input)}
+            onStop={stop}
+            sending={sending}
+            pendingText={pending}
+            onSendNow={sendNow}
+            placeholder="输入消息…"
+            onFocus={() => scrollToEnd()}
+            inputRef={inputRef}
+          />
         </View>
       </KeyboardAvoidingView>
 
@@ -653,27 +512,6 @@ function TranslateSheet({
           <Text style={{ color: palette.text, fontSize: 14.5, lineHeight: 22 }}>{data.result || '…'}</Text>
         </ScrollView>
       </View>
-    </View>
-  );
-}
-
-function TypingDots({ color, small }: { color: string; small?: boolean }) {
-  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0.2)).current, useRef(new Animated.Value(0.4)).current];
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.stagger(140, dots.map((d) => Animated.sequence([
-        Animated.timing(d, { toValue: 1, duration: 300, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(d, { toValue: 0, duration: 300, easing: Easing.in(Easing.quad), useNativeDriver: true }),
-      ]))),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [dots]);
-  return (
-    <View style={styles.dots}>
-      {dots.map((d, i) => (
-        <Animated.View key={i} style={[styles.dot, { backgroundColor: color, width: small ? 5 : 7, height: small ? 5 : 7, opacity: d.interpolate({ inputRange: [0, 1], outputRange: [0.35, 1] }), transform: [{ translateY: d.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }] }]} />
-      ))}
     </View>
   );
 }
@@ -779,72 +617,8 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 22, fontWeight: '800' },
   emptySub: { fontSize: 13, marginTop: 6, marginBottom: space.xl, textAlign: 'center' },
   suggestions: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  sug: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-  },
-  sugIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  row: { flexDirection: 'row', marginBottom: space.md },
-  rowUser: { justifyContent: 'flex-end' },
-  rowAi: { justifyContent: 'flex-start', gap: 8 },
-  aiAvatar: { width: 30, height: 30, borderRadius: 11, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  bubble: { maxWidth: '82%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: radius.xl },
-  bubbleUser: { borderBottomRightRadius: 8 },
-  bubbleAi: { borderBottomLeftRadius: 8 },
-  msgActions: { flexDirection: 'row', gap: 12, marginTop: 6, paddingHorizontal: 2 },
-  planConfirm: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  pendingBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  pendingBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  msgAction: { paddingVertical: 2 },
-  dots: { flexDirection: 'row', gap: 5, height: 20, alignItems: 'center' },
-  dot: { width: 7, height: 7, borderRadius: 4 },
+  sug: { flexGrow: 1, minWidth: '45%', maxWidth: '48%' },
   composer: { paddingHorizontal: space.lg, paddingTop: 8 },
-  composerBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    padding: 6,
-    minHeight: 50,
-  },
-  composerInput: { flex: 1, fontSize: 15, paddingHorizontal: 8, paddingTop: 9, paddingBottom: 9, maxHeight: 120 },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
   sheet: {
     position: 'absolute',
     left: 0,

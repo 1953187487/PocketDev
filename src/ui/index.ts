@@ -4,6 +4,7 @@
  */
 export * from './tokens';
 export * from './base';
+export * from './chat';
 export {
   AuroraBackdrop,
   Button,
