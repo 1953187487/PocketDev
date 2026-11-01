@@ -79,9 +79,21 @@ jobs:
       - name: Prebuild Android project
         run: ${{ fromJSON(needs.config.outputs.config).build.prebuild_command }}
       - name: Build release APK
+        env:
+          JVM_ARGS: ${{ fromJSON(needs.config.outputs.config).build.gradle_jvmargs }}
         run: |
           set -euo pipefail
           cd android
+          # 默认 -Xmx2048m / MaxMetaspaceSize=512m 在 RN 大型构建中会耗尽元空间，导致 daemon 挂起，
+          # 这里按配置把 JVM 堆与元空间写入 gradle.properties 再构建。
+          if [ -n "${JVM_ARGS}" ]; then
+            if grep -q '^org.gradle.jvmargs' gradle.properties; then
+              sed -i "s|^org.gradle.jvmargs=.*|org.gradle.jvmargs=${JVM_ARGS}|" gradle.properties
+            else
+              printf '\norg.gradle.jvmargs=%s\n' "${JVM_ARGS}" >> gradle.properties
+            fi
+            echo "org.gradle.jvmargs -> $(grep '^org.gradle.jvmargs' gradle.properties)"
+          fi
           ${{ fromJSON(needs.config.outputs.config).build.gradle_command }} ${{ fromJSON(needs.config.outputs.config).build.gradle_flags }}
       - name: Sign APK with release keystore
         env:

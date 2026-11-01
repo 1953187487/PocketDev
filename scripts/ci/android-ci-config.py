@@ -43,6 +43,7 @@ DEFAULTS = {
         "prebuild_command": "npx expo prebuild -p android --no-install",
         "gradle_command": "./gradlew assembleRelease",
         "gradle_flags": "--no-daemon --max-workers=1",
+        "gradle_jvmargs": "-Xmx2048m -XX:MaxMetaspaceSize=512m",
         "apk_dir": "android/app/build/outputs/apk/release",
     },
     "release": {

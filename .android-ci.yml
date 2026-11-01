@@ -23,6 +23,7 @@ build:
   prebuild_command: npx expo prebuild -p android --no-install
   gradle_command: ./gradlew assembleRelease
   gradle_flags: '--no-daemon --max-workers=2'
+  gradle_jvmargs: '-Xmx4096m -XX:MaxMetaspaceSize=1024m'   # 默认 2G/512M 在 RN 大型构建会耗尽元空间导致 daemon 挂起
   apk_dir: android/app/build/outputs/apk/release   # 相对 workdir
 
 release:
