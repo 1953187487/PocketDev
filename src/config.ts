@@ -71,3 +71,9 @@ export const DONATION = {
     qr: require('../assets/donate/wechat.png') as number,
   },
 };
+
+
+export const OFFICIAL_QQ_GROUP = {
+  name: 'PocketDev 官方QQ交流群',
+  url: 'https://qun.qq.com/universal-share/share?ac=1&authKey=TxBhG%2FMOlMaUd1YVmpa1NkhvO8zJpRg1C3hic%2F9YV3PYIDapt4z0syEFy9XvMZyQ&busi_data=eyJncm91cENvZGUiOiIxMTI3NDMwNjAzIiwidG9rZW4iOiJPTS9peUhkakpucTUyVkpDSjVWdUhpaEtGUURWZ2RoaHRFNE45SDZtTy9VNzBnOTNzdWt1T1Vma29sSm1VbnhxIiwidWluIjoiMjg2NTUyOTA1NyJ9&data=VOTn4GyXdAhRkTpEsoC1tGiX5We78AHE4CSzm7cRZ57aid5SykwIawy_1yoOQwEUJanOvkD5TEtQHEhYeN-h-g&svctype=4&tempid=h5_group_info',
+};

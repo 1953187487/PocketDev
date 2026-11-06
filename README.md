@@ -26,6 +26,10 @@
 - **首次引导**：语言选择 -> 环境检测 -> 服务商配置（可拉取模型） -> 协议确认（全文可展开收起）四步引导
 - **启动**：全新启动动画与品牌图标（`</>` 标志、极光渐变、沉浸式全屏）
 
+## 官方社区
+
+- **PocketDev 官方QQ交流群**：[点击加入](https://qun.qq.com/universal-share/share?ac=1&authKey=TxBhG%2FMOlMaUd1YVmpa1NkhvO8zJpRg1C3hic%2F9YV3PYIDapt4z0syEFy9XvMZyQ&busi_data=eyJncm91cENvZGUiOiIxMTI3NDMwNjAzIiwidG9rZW4iOiJPTS9peUhkakpucTUyVkpDSjVWdUhpaEtGUURWZ2RoaHRFNE45SDZtTy9VNzBnOTNzdWt1T1Vma29sSm1VbnhxIiwidWluIjoiMjg2NTUyOTA1NyJ9&data=VOTn4GyXdAhRkTpEsoC1tGiX5We78AHE4CSzm7cRZ57aid5SykwIawy_1yoOQwEUJanOvkD5TEtQHEhYeN-h-g&svctype=4&tempid=h5_group_info)
+
 ## 开发者
 
 - **万古沧海** — 主开发者 · 总负责 · 仓库维护

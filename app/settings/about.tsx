@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { DonationSection } from '@/components/DonationSection';
 import { REFERENCES } from '@/agreements';
-import { CONTRIBUTORS, DEVELOPERS, APP_VERSION, APP_REPO_URL, MAIN_DEVELOPER } from '@/config';
+import { CONTRIBUTORS, DEVELOPERS, APP_VERSION, APP_REPO_URL, OFFICIAL_QQ_GROUP } from '@/config';
 
 export default function AboutScreen() {
   const router = useRouter();
@@ -85,6 +85,16 @@ export default function AboutScreen() {
             </Pressable>
           ))}
         </View>
+
+        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 20, marginBottom: 10 }}>官方社区</Text>
+        <Pressable onPress={() => Linking.openURL(OFFICIAL_QQ_GROUP.url)} style={[styles.card, { borderColor: alpha(primary,0.35), backgroundColor: palette.surface, flexDirection:'row', alignItems:'center', gap:12 }]}>
+          <View style={[styles.avatarSm, { backgroundColor: alpha(primary,0.14) }]}><Ionicons name="chatbubbles" size={18} color={primary} /></View>
+          <View style={{ flex:1 }}>
+            <Text style={{ color: palette.text, fontSize: 15, fontWeight: '700' }}>{OFFICIAL_QQ_GROUP.name}</Text>
+            <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 2 }}>点击加入官方QQ交流群，获取更新与反馈支持</Text>
+          </View>
+          <Ionicons name="open-outline" size={16} color={palette.textFaint} />
+        </Pressable>
 
         <DonationSection />
 
