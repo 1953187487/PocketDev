@@ -4,6 +4,7 @@ export {
   validEmail, sendRegisterCode, checkRegisterCode, completeRegister, login, logout,
   accountSnapshot, getCloudSession as getAccountSession, fetchMe,
   getCloudBase, setCloudBase, defaultCloudBase,
+  pingCloud, getLastConn,
   OFFICIAL_EMAIL, OFFICIAL_NICK, OFFICIAL_PASSWORD_HINT,
 } from './cloud';
 

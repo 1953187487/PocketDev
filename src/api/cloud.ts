@@ -30,19 +30,70 @@ export function defaultCloudBase() { return DEFAULT_BASE; }
 export async function getCloudSession(): Promise<CloudSession | null> { return getObject<CloudSession>(SESSION_KEY); }
 async function setCloudSession(s: CloudSession | null): Promise<void> { if(!s) await removeKey(SESSION_KEY); else await setObject(SESSION_KEY, s); }
 
-async function api(path: string, init?: RequestInit & { auth?: boolean }): Promise<any> {
-  const base = await getCloudBase();
-  const headers: Record<string,string> = { 'Content-Type':'application/json', 'X-PD-Client': `pocketdev/${APP_VERSION}` };
-  if (init?.auth !== false) {
-    const s = await getCloudSession();
-    if (s?.token) headers['Authorization'] = 'Bearer ' + s.token;
+export type CloudConn = { ok: boolean; base: string; error?: string; ms?: number };
+let _lastConn: CloudConn | null = null;
+export function getLastConn() { return _lastConn; }
+
+async function fetchWithTimeout(url: string, init: RequestInit, ms = 12000): Promise<Response> {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const t = setTimeout(() => { try { (ctrl as any)?.abort(); } catch {} }, ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl?.signal as any });
+  } finally { clearTimeout(t); }
+}
+
+function normBase(b: string) { return String(b||'').trim().replace(/\/+$/, ''); }
+function baseCandidates(primary: string): string[] {
+  const p = normBase(primary);
+  const set = new Set<string>([p]);
+  // common variants: http<->https, and same host without explicit scheme issues
+  if (p.startsWith('https://')) set.add('http://' + p.slice(8));
+  else if (p.startsWith('http://')) set.add('https://' + p.slice(7));
+  // if user stored host:port without scheme
+  if (p && !/^https?:\/\//i.test(p)) { set.add('http://' + p); set.add('https://' + p); }
+  return Array.from(set).filter(Boolean);
+}
+
+export async function pingCloud(baseOverride?: string): Promise<CloudConn> {
+  const primary = baseOverride ? normBase(baseOverride) : await getCloudBase();
+  const started = Date.now();
+  for (const base of baseCandidates(primary)) {
+    try {
+      const res = await fetchWithTimeout(base + '/health', { method:'GET', headers:{ 'X-PD-Client': `pocketdev/${APP_VERSION}` } }, 10000);
+      const text = await res.text();
+      let data:any = {}; try { data = text?JSON.parse(text):{}; } catch {}
+      if (res.ok && data && data.ok) { _lastConn = { ok:true, base, ms: Date.now()-started }; return _lastConn; }
+    } catch {}
   }
-  const res = await fetch(base + path, { ...init, headers: { ...headers, ...(init?.headers as any) } });
-  const text = await res.text();
-  let data: any = {};
-  try { data = text ? JSON.parse(text) : {}; } catch { data = { ok:false, error: text || `HTTP ${res.status}` }; }
-  if (!res.ok && data && !data.error) data.error = `请求失败(${res.status})`;
-  return data;
+  _lastConn = { ok:false, base: normBase(primary), error: '无法连接云端服务（网络不可达/超时）。请检查网络或稍后重试。' };
+  return _lastConn;
+}
+
+async function api(path: string, init?: RequestInit & { auth?: boolean }): Promise<any> {
+  const primary = await getCloudBase();
+  const makeHeaders = async () => {
+    const headers: Record<string,string> = { 'Content-Type':'application/json', 'X-PD-Client': `pocketdev/${APP_VERSION}` };
+    if (init?.auth !== false) { const s = await getCloudSession(); if (s?.token) headers['Authorization'] = 'Bearer ' + s.token; }
+    return headers;
+  };
+  let lastErr = '';
+  for (const base of baseCandidates(primary)) {
+    try {
+      const headers = await makeHeaders();
+      const res = await fetchWithTimeout(base + path, { ...init, headers: { ...headers, ...(init?.headers as any) } }, 15000);
+      const text = await res.text();
+      let data: any = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { data = { ok:false, error: text || `HTTP ${res.status}` }; }
+      if (!res.ok && data && !data.error) data.error = `请求失败(${res.status})`;
+      // remember working base on success-like HTTP
+      if (res.ok || (data && typeof data.ok === 'boolean')) { if (base !== normBase(primary)) await setCloudBase(base); _lastConn = { ok:true, base }; }
+      return data;
+    } catch (e:any) {
+      const msg = String(e?.message || e || '');
+      lastErr = /abort|timeout/i.test(msg) ? '连接超时，请检查网络' : (msg.includes('Network request failed') ? '网络请求失败（可能是服务不可达或网络受限）' : (msg || '网络错误'));
+    }
+  }
+  return { ok:false, error: lastErr || '无法连接云端服务，请稍后重试' };
 }
 
 export function validEmail(email: string): boolean { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email||'').trim().toLowerCase()); }

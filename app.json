@@ -20,8 +20,11 @@
         "backgroundColor": "#0B1020"
       },
       "permissions": [
-        "android.permission.REQUEST_INSTALL_PACKAGES"
-      ]
+        "android.permission.INTERNET",
+        "android.permission.REQUEST_INSTALL_PACKAGES",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ],
+      "usesCleartextTraffic": true
     },
     "androidStatusBar": {
       "barStyle": "light-content"
@@ -44,7 +47,8 @@
             "buildArchs": [
               "arm64-v8a",
               "armeabi-v7a"
-            ]
+            ],
+            "usesCleartextTraffic": true
           }
         }
       ],

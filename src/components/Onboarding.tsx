@@ -1,5 +1,5 @@
-import React, { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { alpha, radius, space, useTheme } from '@/theme';
@@ -7,11 +7,11 @@ import { AuroraBackdrop, Button, Pill } from '@/ui';
 import { useAppStore, type AppLanguage } from '@/store/app';
 import { NOTICE_SECTIONS, NOTICE_TITLE, NOTICE_VERSION } from '@/agreements';
 import { APP_VERSION } from '@/config';
-import { login, sendRegisterCode, checkRegisterCode, completeRegister, defaultCloudBase } from '@/api/account';
+import { login, sendRegisterCode, checkRegisterCode, completeRegister, pingCloud } from '@/api/account';
 
 const STEPS = [
-  { key: 'agree', icon: 'shield-checkmark' as const, title: '用户须知协议', sub: '三项协议已合并，阅读后勾选同意' },
-  { key: 'auth', icon: 'person-circle-outline' as const, title: '云端账号', sub: '已自动连接云端（无需配置）· 注册或登录' },
+  { key: 'agree', icon: 'shield-checkmark' as const, title: '用户须知协议', sub: '阅读后勾选同意' },
+  { key: 'auth', icon: 'person-circle-outline' as const, title: '云端账号', sub: '已自动连接云端 · 注册或登录' },
   { key: 'ready', icon: 'sparkles' as const, title: '准备完成', sub: '开始使用 PocketDev' },
 ];
 const LANGS: { key: AppLanguage; label: string }[] = [{ key: 'zh', label: '中文' }, { key: 'en', label: 'English' }];
@@ -27,11 +27,22 @@ export function Onboarding() {
   const [authMode, setAuthMode] = useState<'login'|'register'|'verify'|'setpw'>('login');
   const [email, setEmail] = useState(''); const [code, setCode] = useState(''); const [pw, setPw] = useState(''); const [nick, setNick] = useState('');
   const [busy, setBusy] = useState(false); const [authed, setAuthed] = useState(false);
+  const [conn, setConn] = useState<{ok?:boolean;msg:string}>({msg:'正在检测云端连接…'});
 
-  const doSend = async()=>{ setBusy(true); const r=await sendRegisterCode(email); setBusy(false); if(!r.ok) return Alert.alert('发送失败',r.error||'云端暂不可达，请稍后重试'); Alert.alert('验证码已发送','请查收邮箱'); setAuthMode('verify'); };
-  const doVerify = async()=>{ setBusy(true); const r=await checkRegisterCode(email,code); setBusy(false); if(!r.ok) return Alert.alert('验证失败',r.error); setAuthMode('setpw'); };
-  const doComplete = async()=>{ setBusy(true); const r=await completeRegister(email,code,pw,nick); setBusy(false); if(!r.ok) return Alert.alert('失败',r.error); setAuthed(true); Alert.alert('注册成功','云端账号已登录'); };
-  const doLogin = async()=>{ setBusy(true); const r=await login(email,pw); setBusy(false); if(!r.ok) return Alert.alert('登录失败',r.error); setAuthed(true); };
+  const check = async (quiet=false) => {
+    if(!quiet) setConn({msg:'正在检测云端连接…'});
+    try {
+      const r = await pingCloud();
+      setConn(r.ok ? {ok:true,msg:'云端连接正常'} : {ok:false,msg:r.error || '云端暂不可达，请稍后重试'});
+    } catch(e:any){ setConn({ok:false,msg: e?.message||'云端暂不可达'}); }
+  };
+  useEffect(()=>{ check(true); },[]);
+
+  const wrap = async (fn:()=>Promise<void>) => { setBusy(true); try{ await fn(); } finally { setBusy(false); } };
+  const doSend = () => wrap(async()=>{ await check(true); const r=await sendRegisterCode(email); if(!r.ok) return Alert.alert('发送失败', r.error||conn.msg||'云端暂不可达'); Alert.alert('验证码已发送','请查收邮箱'); setAuthMode('verify'); });
+  const doVerify = () => wrap(async()=>{ const r=await checkRegisterCode(email,code); if(!r.ok) return Alert.alert('验证失败', r.error||'验证码错误或已过期'); setAuthMode('setpw'); });
+  const doComplete = () => wrap(async()=>{ const r=await completeRegister(email,code,pw,nick); if(!r.ok) return Alert.alert('注册失败', r.error||'请重试'); setAuthed(true); Alert.alert('注册成功','云端账号已登录'); });
+  const doLogin = () => wrap(async()=>{ await check(true); const r=await login(email,pw); if(!r.ok) return Alert.alert('登录失败', r.error||'请检查账号密码或网络'); setAuthed(true); });
 
   const canNext = step===0 ? agree : step===1 ? authed : true;
   const finish = () => setPrefs({ onboarded: true, onboardedVersion: APP_VERSION, agreementsAccepted: true, privacyAccepted: true });
@@ -69,10 +80,11 @@ export function Onboarding() {
         ) : null}
         {step===1 ? (
           <View style={[styles.card,{ borderColor: palette.border, backgroundColor: palette.surface, gap:10 }]}>
-            <View style={[styles.autoConn,{ borderColor: alpha(palette.success,0.4), backgroundColor: alpha(palette.success,0.08) }]}>
-              <Ionicons name="cloud-done" size={18} color={palette.success} />
-              <Text style={{ color: palette.text, fontSize:13, fontWeight:'700', flex:1 }}>云端已自动连接，无需配置</Text>
-            </View>
+            <Pressable onPress={()=>check(false)} style={[styles.autoConn,{ borderColor: alpha(conn.ok===false? '#e05a5a':palette.success,0.45), backgroundColor: alpha(conn.ok===false? '#e05a5a':palette.success,0.08) }]}>
+              <Ionicons name={conn.ok===false?'cloud-offline':'cloud-done'} size={18} color={conn.ok===false?'#e05a5a':palette.success} />
+              <Text style={{ color: palette.text, fontSize:13, fontWeight:'700', flex:1 }}>{conn.msg}</Text>
+              {conn.ok===undefined ? <ActivityIndicator size="small" color={primary} /> : <Text style={{color:primary,fontSize:12}}>重试</Text>}
+            </Pressable>
             {authed ? <Pill text="云端账号已就绪" color={palette.success} icon="checkmark-circle" /> : null}
             {!authed ? (<>
               <TextInput value={email} onChangeText={setEmail} placeholder="邮箱" placeholderTextColor={palette.textFaint} autoCapitalize="none" keyboardType="email-address" style={inp as any} />
@@ -83,16 +95,16 @@ export function Onboarding() {
               {authMode==='register'? (<><Button title={busy?'发送中…':'发送验证码'} onPress={doSend} loading={busy} /><Pressable onPress={()=>setAuthMode('login')}><Text style={{color:palette.textDim,textAlign:'center'}}>返回登录</Text></Pressable></>) : null}
               {authMode==='verify'? <Button title="验证" onPress={doVerify} loading={busy} /> : null}
               {authMode==='setpw'? <Button title={busy?'提交中…':'完成注册并登录'} onPress={doComplete} loading={busy} /> : null}
-              <Text style={{color:palette.textFaint,fontSize:11.5}}>流程：邮箱→验证码→设置密码→登录；云端不支持重复并发登录。</Text>
+              <Text style={{color:palette.textFaint,fontSize:11.5}}>流程：邮箱→验证码→设置密码→登录。若提示不可达，多为云端隧道离线，可点上方重试。</Text>
             </>) : <Text style={{color:palette.textDim}}>可进入下一步。</Text>}
           </View>
         ) : null}
         {step===2 ? (
           <View style={[styles.card,{ borderColor: palette.border, backgroundColor: palette.surface, alignItems:'center', gap:10 }]}>
-            <Pill text="云端已连接" color={palette.success} icon="cloud-done" />
+            <Pill text={conn.ok?'云端已连接':'云端待连接'} color={conn.ok?palette.success:palette.textDim} icon="cloud-done" />
             <Pill text={agree?'协议已同意':'-'} color={palette.success} icon="shield-checkmark" />
             <Pill text={authed?'账号已登录':'未登录'} color={authed?palette.success:palette.danger} icon="person" />
-            <Text style={{ color: palette.textDim, fontSize:13, textAlign:'center', lineHeight:20, marginTop:6 }}>账号、云存档、公告与官方渠道均已由云端提供。</Text>
+            <Text style={{ color: palette.textDim, fontSize:13, textAlign:'center', lineHeight:20, marginTop:6 }}>账号、云存档、公告与官方渠道均由云端提供。</Text>
           </View>
         ) : null}
       </ScrollView>
