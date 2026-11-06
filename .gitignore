@@ -19,3 +19,4 @@ data/
 backend/data/
 backend/.env.local
 backend/frpc.ini
+backend/frpc.toml

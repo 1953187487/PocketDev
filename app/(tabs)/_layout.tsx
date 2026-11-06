@@ -43,13 +43,19 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="mine"
+        options={{
+          title: '我的',
+          tabBarLabel: '我的',
+          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
+            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="settings"
         options={{
-          title: '设置',
-          tabBarLabel: '设置',
-          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={20} color={color} />
-          ),
+          href: null,
         }}
       />
     </Tabs>
