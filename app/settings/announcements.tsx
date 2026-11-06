@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { AuroraBackdrop, SectionLabel, Surface } from '@/ui';
+import { AuroraBackdrop, SectionLabel } from '@/ui';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { listAnnouncements, publishAnnouncement, removeAnnouncement, Announcement } from '@/api/announcements';

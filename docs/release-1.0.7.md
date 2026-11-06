@@ -24,3 +24,9 @@ git push origin v1.0.7
 ## 安全提醒（务必）
 - **立刻吊销/轮换**你在聊天里暴露过的 GitHub PAT（`ghp_...`）和任何 QQ 登录密码；QQ 发信只用 **SMTP 授权码**。
 - `mail-server/.env.local`、keystore、授权码 **不要提交**（已 gitignore `mail-server/.env.local`/`data/`）。
+
+## 自动发布状态
+- 已推送 commit  与 tag ，触发 Release workflow。
+- 已通过 GitHub API 配置 Actions Secrets（ANDROID_KEYSTORE_*，PKCS12/base64；apksigner 自动识别）。
+- Actions: https://github.com/1953187487/PocketDev/actions  Releases: https://github.com/1953187487/PocketDev/releases/tag/v1.0.7
+- 若签名因 keystore 格式失败：在有 JDK 的机器运行  生成 JKS 并重新设置 Secrets，再重打 tag。

@@ -3,7 +3,7 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
-import { AuroraBackdrop, SectionLabel } from '@/ui';
+import { AuroraBackdrop } from '@/ui';
 import { alpha, radius, space, useTheme } from '@/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createSave, deleteSave, exportSavePath, listSaves, restoreSave, CloudSaveMeta } from '@/api/cloudsave';
