@@ -1,6 +1,6 @@
 # PocketDev
 
-手机端 AI 开发工具（1.0.3），基于 [chaitin/MonkeyCode](https://github.com/chaitin/MonkeyCode) 的 AI 能力层构建。
+手机端 AI 开发工具（1.0.7），基于 [chaitin/MonkeyCode](https://github.com/chaitin/MonkeyCode) 的 AI 能力层构建。
 
 ## 功能
 

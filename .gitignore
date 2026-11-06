@@ -9,3 +9,8 @@ ios/
 
 # 本地校验和文件
 *.apk.sha256
+
+# 本地邮件凭据（勿提交）
+mail-server/.env.local
+mail-server/node_modules/
+data/

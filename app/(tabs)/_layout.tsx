@@ -6,7 +6,7 @@ import { GlassTabBar } from '@/components/GlassTabBar';
 export default function TabsLayout() {
   return (
     <Tabs
-      tabBar={(props) => <GlassTabBar {...(props as any)} />}
+      tabBar={(props: any) => <GlassTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: 'transparent' },
@@ -17,7 +17,7 @@ export default function TabsLayout() {
         options={{
           title: '对话',
           tabBarLabel: '对话',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={20} color={color} />
           ),
         }}
@@ -27,7 +27,7 @@ export default function TabsLayout() {
         options={{
           title: '仓库',
           tabBarLabel: '仓库',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <Ionicons name={focused ? 'git-branch' : 'git-branch-outline'} size={20} color={color} />
           ),
         }}
@@ -37,7 +37,7 @@ export default function TabsLayout() {
         options={{
           title: '更多',
           tabBarLabel: '更多',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <Ionicons name={focused ? 'apps' : 'apps-outline'} size={20} color={color} />
           ),
         }}
@@ -47,7 +47,7 @@ export default function TabsLayout() {
         options={{
           title: '设置',
           tabBarLabel: '设置',
-          tabBarIcon: ({ color, focused }) => (
+          tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <Ionicons name={focused ? 'settings' : 'settings-outline'} size={20} color={color} />
           ),
         }}

@@ -2,7 +2,7 @@
   "expo": {
     "name": "PocketDev",
     "slug": "pocketdev",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "scheme": "pocketdev",
     "userInterfaceStyle": "automatic",
@@ -11,7 +11,7 @@
     "backgroundColor": "#080B16",
     "android": {
       "package": "com.pocketdev.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "minSdkVersion": 26,
       "compileSdkVersion": 36,
       "targetSdkVersion": 36,
@@ -41,7 +41,10 @@
             "minSdkVersion": 26,
             "compileSdkVersion": 36,
             "targetSdkVersion": 36,
-            "buildArchs": ["arm64-v8a", "armeabi-v7a"]
+            "buildArchs": [
+              "arm64-v8a",
+              "armeabi-v7a"
+            ]
           }
         }
       ],

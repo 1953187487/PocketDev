@@ -25,6 +25,13 @@ export function SettingsHub() {
 
   const entries: Entry[] = [
     {
+      icon: 'person-circle-outline',
+      title: '账号与登录',
+      subtitle: '邮箱注册/登录 · 官方账号 · 聊天渠道 · 云存档',
+      route: '/settings/account',
+      badge: { text: '1.0.7', color: undefined, icon: 'sparkles' },
+    },
+    {
       icon: 'server-outline',
       title: '自定义服务商',
       subtitle: provider.model ? `模型：${provider.model}` : '配置 AI 对话的服务商与模型',
@@ -56,6 +63,12 @@ export function SettingsHub() {
       title: '检查更新',
       subtitle: `当前版本 v${APP_VERSION}${prefs.autoUpdate ? ' · 自动更新已开启' : ' · 自动更新已关闭'}`,
       route: '/settings/update',
+    },
+    {
+      icon: 'megaphone-outline',
+      title: '公告',
+      subtitle: '查看与发布公告（可通过官方渠道）',
+      route: '/settings/announcements'
     },
     {
       icon: 'shield-checkmark-outline',

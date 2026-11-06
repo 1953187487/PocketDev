@@ -26,6 +26,13 @@ export default function MoreScreen() {
 
   const entries: MoreEntry[] = [
     {
+      icon: 'person-circle-outline',
+      title: '账号与聊天渠道',
+      subtitle: '登录/注册、官方账号、云存档、公告',
+      route: '/settings/account',
+      badge: '1.0.7',
+    },
+    {
       icon: 'folder-open-outline',
       title: '本地目录工作区',
       subtitle: '选择手机本地目录作为工作区',

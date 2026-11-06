@@ -335,3 +335,13 @@ export function useLocalWorkspaces(): Workspace[] {
   const { workspaces } = useAppStore();
   return workspaces.filter((w) => w.kind === 'local' && !!w.root);
 }
+
+// 1.0.7: 账号会话状态（轻量镜像，真实数据在 api/account）
+export interface AccountSessionView {
+  userId: string;
+  email: string;
+  nickname: string;
+  token: string;
+  loginAt: number;
+  isOfficial?: boolean;
+}
