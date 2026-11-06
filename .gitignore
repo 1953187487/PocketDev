@@ -14,3 +14,7 @@ ios/
 mail-server/.env.local
 mail-server/node_modules/
 data/
+
+# Cloud backend runtime data & secrets (never commit)
+backend/data/
+backend/.env.local

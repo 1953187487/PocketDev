@@ -29,7 +29,7 @@ export default function AnnouncementsScreen() {
 
   const publish = async () => {
     if (!title.trim() || !body.trim()) return Alert.alert('提示', '请填写标题和内容');
-    await publishAnnouncement({ title, body, author, level: 'info' });
+    await publishAnnouncement({ title, body, level: 'info' });
     setTitle(''); setBody('');
     load();
     Alert.alert('已发布', '公告已保存在本设备（可通过渠道分享）');

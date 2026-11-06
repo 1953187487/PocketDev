@@ -185,6 +185,7 @@ jobs:
             echo "- SHA-256: \`${sha}\`"
             echo "- 下载: \`${out}\`"
           } > build/ci/RELEASE_NOTES.md
+          gh release delete "$TAG" -y >/dev/null 2>&1 || true
           gh release create "$TAG" \
             "build/ci/$out" "build/ci/$out.sha256" \
             --title "PocketDev v${VERSION}" \

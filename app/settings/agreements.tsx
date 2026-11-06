@@ -1,158 +1,81 @@
-import { Button, Divider, Pill, Row, SubScreen } from '@/ui';
+import { AuroraBackdrop, Button, Pill, SubScreen } from '@/ui';
 import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { alpha, radius, space, useTheme } from '@/theme';
-import { AGREEMENTS, REFERENCES } from '@/agreements';
+import { NOTICE_SECTIONS, NOTICE_TITLE, NOTICE_VERSION, REFERENCES } from '@/agreements';
 import { useAppStore } from '@/store/app';
-import { APP_REPO_URL, DEVELOPERS, CONTRIBUTORS } from '@/config';
-
-const SECURITY_ITEMS: { icon: keyof typeof Ionicons.glyphMap; title: string; desc: string }[] = [
-  { icon: 'lock-closed-outline', title: '本地加密存储', desc: '服务商配置与访问令牌仅保存在设备私有目录，卸载即清除' },
-  { icon: 'phone-portrait-outline', title: '最小权限原则', desc: '仅申请实现功能所必需的权限，可随时在系统设置关闭' },
-  { icon: 'cloud-offline-outline', title: '无第三方采集', desc: '不部署数据采集服务器，不使用 Cookie、不做设备指纹' },
-  { icon: 'git-network-outline', title: '直连不中转', desc: '请求由设备直连你的服务商与代码托管平台，我们不经手' },
-  { icon: 'shield-checkmark-outline', title: '本地模型优先', desc: '支持完全离线的翻译、语音与对话，最大化隐私保护' },
-];
+import { APP_REPO_URL } from '@/config';
 
 export default function AgreementsScreen() {
   const router = useRouter();
   const { theme } = useTheme();
-  const { palette, primary } = theme;
+  const { palette, primary, primaryText } = theme;
   const { prefs, setPrefs } = useAppStore();
-  const [open, setOpen] = useState<string | null>('privacy');
-
-  const allAccepted = prefs.agreementsAccepted && prefs.privacyAccepted;
+  const [open, setOpen] = useState<string | null>('summary');
+  const accepted = !!prefs.agreementsAccepted && !!prefs.privacyAccepted;
 
   return (
-    <SubScreen title="协议与隐私" onBack={() => router.back()}>
-      <View style={{ paddingHorizontal: space.lg }}>
-        <Text style={{ color: palette.textDim, fontSize: 13, lineHeight: 20, marginBottom: 16 }}>
-          PocketDev 遵循 AGPL-3.0 开源协议，并以用户隐私为第一优先级。以下协议可随时查阅。
-        </Text>
+    <SubScreen title="用户须知协议" onBack={() => router.back()}>
+      <View style={{ paddingHorizontal: space.lg, paddingBottom: 24 }}>
+        <View style={[styles.hero, { borderColor: alpha(primary, 0.35), backgroundColor: alpha(primary, 0.08) }]}>
+          <View style={[styles.heroIcon, { backgroundColor: alpha(primary, 0.16) }]}>
+            <Ionicons name="shield-checkmark" size={26} color={primary} />
+          </View>
+          <Text style={{ color: palette.text, fontSize: 20, fontWeight: '900', marginTop: 10 }}>{NOTICE_TITLE}</Text>
+          <Text style={{ color: palette.textDim, fontSize: 12.5, marginTop: 4, textAlign: 'center', lineHeight: 18 }}>
+            已合并开源说明、使用须知与隐私条款 · 版本 {NOTICE_VERSION}
+          </Text>
+          <View style={{ marginTop: 10 }}>
+            <Pill text={accepted ? '你已同意' : '请阅读并同意'} color={accepted ? palette.success : primary} icon={accepted ? 'checkmark-circle' : 'alert-circle'} />
+          </View>
+        </View>
 
-        {AGREEMENTS.map((a) => {
-          const expanded = open === a.key;
-          const accepted = a.key === 'privacy' ? prefs.privacyAccepted : prefs.agreementsAccepted;
+        {NOTICE_SECTIONS.map((s) => {
+          const expanded = open === s.key;
           return (
-            <View key={a.key} style={[styles.card, { borderColor: expanded ? alpha(primary, 0.4) : palette.border, backgroundColor: palette.surface }]}>
-              <Pressable onPress={() => setOpen(expanded ? null : a.key)} style={styles.cardHead}>
-                <View style={[styles.icon, { backgroundColor: alpha(primary, 0.1) }]}>
-                  <Ionicons
-                    name={a.key === 'oss' ? 'logo-github' : a.key === 'notice' ? 'information-circle-outline' : 'shield-checkmark-outline'}
-                    size={18}
-                    color={primary}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: palette.text, fontSize: 15, fontWeight: '700' }}>{a.title}</Text>
-                  <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2 }}>
-                    {accepted ? '已同意' : '未同意'} · 点击展开全文
-                  </Text>
-                </View>
-                {accepted ? <Pill text="已同意" color={palette.success} icon="checkmark-circle" /> : null}
-                <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={17} color={palette.textFaint} />
-              </Pressable>
-              {expanded ? (
-                <>
-                  <Divider style={{ marginVertical: 12 }} />
-                  <Text style={{ color: palette.textDim, fontSize: 13, lineHeight: 22 }}>{a.body}</Text>
-                </>
-              ) : null}
-            </View>
+            <Pressable key={s.key} onPress={() => setOpen(expanded ? null : s.key)} style={[styles.card, { borderColor: expanded ? alpha(primary, 0.45) : palette.border, backgroundColor: palette.surface }]}>
+              <View style={styles.row}>
+                <Text style={{ color: palette.text, fontSize: 15, fontWeight: '800', flex: 1 }}>{s.title}</Text>
+                <Ionicons name={expanded ? 'chevron-up-circle' : 'chevron-down-circle-outline'} size={20} color={expanded ? primary : palette.textFaint} />
+              </View>
+              {expanded ? <Text style={{ color: palette.textDim, fontSize: 13.5, lineHeight: 22, marginTop: 10 }}>{s.body}</Text> : null}
+            </Pressable>
           );
         })}
 
-        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 22, marginBottom: 10 }}>引用来源</Text>
-        {REFERENCES.map((r) => (
-          <Row key={r.name} style={{ gap: 12, paddingVertical: 9, alignItems: 'flex-start' }}>
-            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.08) }]}>
-              <Ionicons name="logo-github" size={16} color={palette.textDim} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '700' }}>{r.name}</Text>
-                <Pill text={r.license} color={palette.textDim} />
+        <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 14, marginBottom: 8 }}>第三方与致谢</Text>
+        <View style={{ gap: 6 }}>
+          {REFERENCES.map((r) => (
+            <Pressable key={r.name} onPress={() => Linking.openURL(r.url)} style={[styles.ref, { borderColor: palette.border, backgroundColor: palette.surfaceSunken }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: palette.text, fontSize: 13, fontWeight: '700' }}>{r.name}</Text>
+                <Text style={{ color: palette.textFaint, fontSize: 11.5 }}>{r.license} · {r.note}</Text>
               </View>
-              <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 17 }}>{r.note}</Text>
-            </View>
-            <Pressable hitSlop={8} onPress={() => Linking.openURL(r.url)}>
-              <Ionicons name="open-outline" size={15} color={palette.textDim} />
+              <Ionicons name="open-outline" size={15} color={palette.textFaint} />
             </Pressable>
-          </Row>
-        ))}
-
-        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 22, marginBottom: 10 }}>安全承诺</Text>
-        {SECURITY_ITEMS.map((s) => (
-          <Row key={s.title} style={{ gap: 12, paddingVertical: 10, alignItems: 'flex-start' }}>
-            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.1) }]}>
-              <Ionicons name={s.icon} size={16} color={primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: palette.text, fontSize: 14, fontWeight: '600' }}>{s.title}</Text>
-              <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 18 }}>{s.desc}</Text>
-            </View>
-          </Row>
-        ))}
-
-        <Text style={{ color: palette.textDim, fontSize: 12, marginTop: 22, marginBottom: 10 }}>开发者与贡献者</Text>
-        {DEVELOPERS.map((d) => (
-          <Row key={d.name} style={{ gap: 12, paddingVertical: 8, alignItems: 'center' }}>
-            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.1) }]}>
-              <Ionicons name="person-circle-outline" size={18} color={primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: palette.text, fontSize: 14, fontWeight: '700' }}>{d.name}</Text>
-              <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 2, lineHeight: 18 }}>{d.role}</Text>
-            </View>
-            {d.link ? (
-              <Pressable hitSlop={8} onPress={() => d.link && Linking.openURL(d.link)}>
-                <Ionicons name="open-outline" size={16} color={palette.textDim} />
-              </Pressable>
-            ) : null}
-          </Row>
-        ))}
-        {CONTRIBUTORS.map((c) => (
-          <Row key={c.name} style={{ gap: 12, paddingVertical: 8, alignItems: 'center' }}>
-            <View style={[styles.iconSm, { backgroundColor: alpha(primary, 0.06) }]}>
-              <Ionicons name="people-outline" size={16} color={palette.textDim} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: palette.text, fontSize: 13.5, fontWeight: '600' }}>{c.name}</Text>
-              <Text style={{ color: palette.textFaint, fontSize: 11.5, marginTop: 2, lineHeight: 17 }}>{c.role}</Text>
-            </View>
-            {c.link ? (
-              <Pressable hitSlop={8} onPress={() => c.link && Linking.openURL(c.link)}>
-                <Ionicons name="open-outline" size={15} color={palette.textFaint} />
-              </Pressable>
-            ) : null}
-          </Row>
-        ))}
-
-        <View style={{ marginTop: 18 }}>
-          <Button
-            title={allAccepted ? '已同意全部协议' : '同意全部协议'}
-            icon={allAccepted ? 'checkmark-circle' : 'checkmark'}
-            variant={allAccepted ? 'secondary' : 'primary'}
-            onPress={() => {
-              setPrefs({ agreementsAccepted: true, privacyAccepted: true });
-              router.back();
-            }}
-          />
+          ))}
         </View>
 
-        <Text style={{ color: palette.textFaint, fontSize: 12, marginTop: 12, lineHeight: 18 }}>
-          隐私问题反馈：{APP_REPO_URL}
-        </Text>
+        <View style={{ marginTop: 18, gap: 10 }}>
+          <Button
+            title={accepted ? '已同意（可重新确认）' : '我已阅读并同意《用户须知协议》'}
+            icon="checkmark-done"
+            variant={accepted ? 'secondary' : 'primary'}
+            onPress={() => { setPrefs({ agreementsAccepted: true, privacyAccepted: true }); router.back(); }}
+          />
+          <Text style={{ color: palette.textFaint, fontSize: 11.5, lineHeight: 17, textAlign: 'center' }}>反馈：{APP_REPO_URL}/issues</Text>
+        </View>
       </View>
     </SubScreen>
   );
 }
 
 const styles = StyleSheet.create({
+  hero: { borderWidth: 1, borderRadius: radius.xl, padding: 18, alignItems: 'center', marginBottom: 14 },
+  heroIcon: { width: 54, height: 54, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   card: { borderWidth: 1, borderRadius: radius.lg, padding: 14, marginBottom: 10 },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  icon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  iconSm: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  ref: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: radius.md, padding: 10 },
 });
