@@ -18,3 +18,4 @@ data/
 # Cloud backend runtime data & secrets (never commit)
 backend/data/
 backend/.env.local
+backend/frpc.ini

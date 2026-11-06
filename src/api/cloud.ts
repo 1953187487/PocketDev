@@ -17,7 +17,7 @@ export type AuthResult = { ok: true; session: CloudSession } | { ok: false; erro
 
 const SESSION_KEY = 'cloud_session_v1';
 const BASE_KEY = 'cloud_api_base_v1';
-const DEFAULT_BASE = 'https://pocketdev-cloud.local'; // 可在账号页修改为实际云端地址
+const DEFAULT_BASE = 'http://107.173.180.64:17888'; // 内网穿透云端(默认)
 
 export async function getCloudBase(): Promise<string> {
   const v = await getObject<string>(BASE_KEY);
